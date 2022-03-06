@@ -24,6 +24,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "convert_case"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb4a24b1aaf0fd0ce8b45161144d6f42cd91677fd5940fd431183eb023b3a2b8"
+
+[[package]]
 name = "crossbeam-channel"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -76,21 +82,6 @@ dependencies = [
  "darling_core",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "derive-trait-enum"
-version = "0.1.0"
-dependencies = [
- "catty",
- "crossbeam-channel",
- "darling",
- "flume",
- "futures",
- "proc-macro2",
- "quote",
- "syn",
- "tokio",
 ]
 
 [[package]]
@@ -375,6 +366,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af73ac49756f3f7c01172e34a23e5d0216f6c32333757c2c61feb2bbff5a5ee"
 dependencies = [
  "pin-project-lite",
+]
+
+[[package]]
+name = "trait-enumizer"
+version = "0.1.0"
+dependencies = [
+ "catty",
+ "convert_case",
+ "crossbeam-channel",
+ "darling",
+ "flume",
+ "futures",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "tokio",
 ]
 
 [[package]]

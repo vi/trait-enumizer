@@ -1,3 +1,4 @@
+#[trait_enumizer::enumizer]
 trait MyIface {
     fn foo(&self);
     fn bar(&self, x: i32);
@@ -20,18 +21,10 @@ impl MyIface for Implementor {
     }
 }
 
-// Begin of the part which is supposed to be auto-generated
-
-enum MyIfaceEnum {
-    Foo,
-    Bar { x: i32 },
-    Baz { y: String, z: Vec<u8> },
-}
-
 impl MyIfaceEnum {
     fn call<I: MyIface>(self, o: &I) {
         match self {
-            MyIfaceEnum::Foo => o.foo(),
+            MyIfaceEnum::Foo {} => o.foo(),
             MyIfaceEnum::Bar { x } => o.bar(x),
             MyIfaceEnum::Baz { y, z } => o.baz(y, z),
         }
@@ -60,7 +53,7 @@ impl<R:MyIfaceResultified<std::convert::Infallible>> MyIface for R {
 struct MyIfaceProxy<E, F: Fn(MyIfaceEnum)-> Result<(), E> > (F);
 impl<E, F: Fn(MyIfaceEnum) -> Result<(), E>> MyIfaceResultified<E> for MyIfaceProxy<E, F> {
     fn try_foo(&self) -> Result<(), E> {
-        self.0(MyIfaceEnum::Foo)
+        self.0(MyIfaceEnum::Foo{})
     }
 
     fn try_bar(&self, x: i32) -> Result<(), E> {
