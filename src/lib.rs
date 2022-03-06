@@ -19,17 +19,35 @@ impl std::fmt::Debug for Argument {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone,Copy,Debug)]
 enum ReceiverStyle {
     Move,
     Ref,
     Mut,
+}
+impl ReceiverStyle {
+    fn ts(self) -> TokenStream {
+        match self {
+            ReceiverStyle::Move => q!{self},
+            ReceiverStyle::Ref => q!{&self},
+            ReceiverStyle::Mut => q!{&mut self},
+        }
+    }
 }
 
 struct Method {
     name: Ident,
     receiver_style: ReceiverStyle,
     args: Vec<Argument>,
+}
+
+impl Method {
+    fn variant_name(&self) -> proc_macro2::Ident {
+        quote::format_ident!(
+            "{}",
+            self.name.to_string().to_case(convert_case::Case::UpperCamel)
+        )
+    }
 }
 
 impl std::fmt::Debug for Method {
@@ -154,10 +172,7 @@ impl TheTrait {
         let enum_name = quote::format_ident!("{}Enum", self.name);
         let mut variants = TokenStream::new();
         for method in &self.methods {
-            let variant_name = quote::format_ident!(
-                "{}",
-                method.name.to_string().to_case(convert_case::Case::UpperCamel)
-            );
+            let variant_name = method.variant_name();
             let mut variant_params = TokenStream::new();
             for arg in &method.args {
                 let n = &arg.name;
@@ -176,6 +191,145 @@ impl TheTrait {
             }
         });
     }
+
+    fn generate_call_fn(&self, out: &mut TokenStream) { 
+        let enum_name = quote::format_ident!("{}Enum", self.name);
+        let name = &self.name;
+        let mut variants = TokenStream::new();
+        for method in &self.methods {
+            let variant_name = quote::format_ident!(
+                "{}",
+                method.name.to_string().to_case(convert_case::Case::UpperCamel)
+            );
+            let method_name = &method.name;
+            let mut variant_params = TokenStream::new();
+            for arg in &method.args {
+                let n = &arg.name;
+                //let t = &arg.ty;
+                variant_params.extend(q!{
+                    #n,
+                });
+            }
+            variants.extend(q!{
+                #enum_name::#variant_name { #variant_params } => o.#method_name(#variant_params),
+            });
+        }
+        out.extend(q! {
+            impl #enum_name {
+                fn call<I: #name>(self, o: &I) {
+                    match self {
+                        #variants
+                    }
+                }
+            }
+        });
+    }
+    fn generate_resultified_trait(&self, out: &mut TokenStream) { 
+        let rt_name = quote::format_ident!("{}Resultified", self.name);
+        //let name = &self.name;
+        let mut methods = TokenStream::new();
+        for method in &self.methods {
+            let rt_method_name = quote::format_ident!(
+                "try_{}",
+                method.name,
+            );
+            // let method_name = &method.name;
+            let mut args = TokenStream::new();
+            for arg in &method.args {
+                let n = &arg.name;
+                let t = &arg.ty;
+                args.extend(q!{
+                    #n : #t,
+                });
+            }
+            let slf = method.receiver_style.ts();
+            methods.extend(q!{
+                fn #rt_method_name(#slf, #args ) -> ::std::result::Result<(), E>;
+            });
+        }
+        out.extend(q! {
+            trait #rt_name<E> {
+                #methods
+            }
+        });
+    }
+
+    fn generate_resultified_trait_blanked_impl(&self, out: &mut TokenStream) {
+        let rt_name = quote::format_ident!("{}Resultified", self.name);
+        let name = &self.name;
+        let mut methods = TokenStream::new();
+        for method in &self.methods {
+            let rt_method_name = quote::format_ident!(
+                "try_{}",
+                method.name,
+            );
+            let method_name = &method.name;
+            let mut args_with_types = TokenStream::new();
+            let mut args_without_types = TokenStream::new();
+            for arg in &method.args {
+                let n = &arg.name;
+                let t = &arg.ty;
+                args_with_types.extend(q!{
+                    #n : #t,
+                });
+                args_without_types.extend(q!{
+                    #n,
+                });
+            }
+            let slf = method.receiver_style.ts();
+            methods.extend(q!{
+                fn #method_name(#slf, #args_with_types ) {
+                    R::#rt_method_name(#slf, #args_without_types).unwrap()
+                }
+            });
+        }
+        out.extend(q! {
+            impl<R:#rt_name<::std::convert::Infallible>> #name for R {
+                #methods
+            }
+        });
+    }
+
+    fn generate_resultified_proxy(&self, out: &mut TokenStream) {
+        let enum_name = quote::format_ident!("{}Enum", self.name);
+        let rt_name = quote::format_ident!("{}Resultified", self.name);
+        let proxy_name = quote::format_ident!("{}Proxy", self.name);
+        //let name = &self.name;
+        let mut methods = TokenStream::new();
+        for method in &self.methods {
+            let rt_method_name = quote::format_ident!(
+                "try_{}",
+                method.name,
+            );
+            //let method_name = &method.name;
+            let variant_name = method.variant_name();
+            let mut args_with_types = TokenStream::new();
+            let mut args_without_types = TokenStream::new();
+            for arg in &method.args {
+                let n = &arg.name;
+                let t = &arg.ty;
+                args_with_types.extend(q!{
+                    #n : #t,
+                });
+                args_without_types.extend(q!{
+                    #n,
+                });
+            }
+            let slf = method.receiver_style.ts();
+            methods.extend(q!{
+                fn #rt_method_name(#slf, #args_with_types ) -> ::std::result::Result<(), E> {
+                    self.0(#enum_name::#variant_name{ #args_without_types })
+                }
+            });
+        }
+        out.extend(q! {
+            struct #proxy_name<E, F: Fn(#enum_name)-> ::std::result::Result<(), E> > (F);
+
+            impl<E, F: Fn(#enum_name) -> ::std::result::Result<(), E>> #rt_name<E> for #proxy_name<E, F> {
+                #methods
+            }
+        });
+    }
 }
 
 #[proc_macro_attribute]
@@ -189,5 +343,9 @@ pub fn enumizer(
     let thetrait = TheTrait::parse(tra);
     //dbg!(thetrait);
     thetrait.generate_enum(&mut ret);
+    thetrait.generate_call_fn(&mut ret);
+    thetrait.generate_resultified_trait(&mut ret);
+    thetrait.generate_resultified_trait_blanked_impl(&mut ret);
+    thetrait.generate_resultified_proxy(&mut ret);
     ret.into()
 }
