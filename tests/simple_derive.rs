@@ -1,4 +1,4 @@
-#[trait_enumizer::enumizer]
+#[trait_enumizer::enumizer(impl_directly, ref_proxy)]
 trait MyIface {
     fn foo(&self);
     fn bar(&self, x: i32);
@@ -22,7 +22,7 @@ impl MyIface for Implementor {
 }
 
 #[test]
-fn simple() {
+fn test() {
     let o = Implementor {};
     let p = MyIfaceProxy::<std::convert::Infallible,_>(|c| Ok(c.call(&o)));
     p.foo();

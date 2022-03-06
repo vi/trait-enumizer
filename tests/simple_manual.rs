@@ -36,6 +36,23 @@ impl MyIfaceEnum {
             MyIfaceEnum::Baz { y, z } => o.baz(y, z),
         }
     }
+    #[allow(unused)]
+    fn call_mut<I: MyIface>(self, o: &mut I) {
+        match self {
+            MyIfaceEnum::Foo => o.foo(),
+            MyIfaceEnum::Bar { x } => o.bar(x),
+            MyIfaceEnum::Baz { y, z } => o.baz(y, z),
+        }
+    }
+
+    #[allow(unused)]
+    fn call_once<I: MyIface>(self, o: I) {
+        match self {
+            MyIfaceEnum::Foo => o.foo(),
+            MyIfaceEnum::Bar { x } => o.bar(x),
+            MyIfaceEnum::Baz { y, z } => o.baz(y, z),
+        }
+    }
 }
 trait MyIfaceResultified<E> {
     fn try_foo(&self) -> Result<(), E>;
