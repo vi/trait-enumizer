@@ -24,37 +24,6 @@ impl MyIface for Implementor {
     }
 }
 
-trait SyncChannelClass {
-    type Sender<T>;
-    type Receiver<T>;
-    type SendError;
-    type RecvError;
-    fn create<T>(&self) -> (Self::Sender<T>, Self::Receiver<T>);
-    fn send<T>(s: Self::Sender<T>, msg: T) -> Result<(), Self::SendError>;
-    fn recv<T>(r: Self::Receiver<T>) -> Result<T, Self::RecvError>;
-}
-
-struct FlumeChannelClass;
-impl SyncChannelClass for FlumeChannelClass {
-    type Sender<T> = flume::Sender<T>;
-    type Receiver<T> = flume::Receiver<T>;
-    type SendError = &'static str;
-    type RecvError = flume::RecvError;
-
-    fn create<T>(&self) -> (Self::Sender<T>, Self::Receiver<T>) {
-        flume::bounded(1)
-    }
-
-    fn send<T>(s: Self::Sender<T>, msg: T) -> Result<(), Self::SendError> {
-        s.send(msg)
-            .map_err(|_| "Failed to send to flume channel to deliver return value")
-    }
-
-    fn recv<T>(r: Self::Receiver<T>) -> Result<T, Self::RecvError> {
-        r.recv()
-    }
-}
-
 // Begin of the part which is supposed to be auto-generated
 
 enum MyIfaceEnum<CC: SyncChannelClass> {
@@ -126,6 +95,8 @@ where
 }
 
 // End of the part which is supposed to be auto-generated
+
+use trait_enumizer::{SyncChannelClass, FlumeChannelClass};
 
 #[test]
 fn simple() {
