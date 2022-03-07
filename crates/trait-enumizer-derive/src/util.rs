@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 
-use crate::Argument;
+use crate::{Argument, AccessMode};
 
 use super::{TheTrait, ReceiverStyle};
 
@@ -103,4 +103,14 @@ impl ReceiverStyle {
            ReceiverStyle::Ref => "call",
        }
    }
+}
+
+impl AccessMode {
+    pub(crate) fn code(self) -> TokenStream {
+        match self {
+            AccessMode::Priv => q!{},
+            AccessMode::Pub => q!{pub},
+            AccessMode::PubCrate => q!{pub(crate)},
+        }
+    } 
 }

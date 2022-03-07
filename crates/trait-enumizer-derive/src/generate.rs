@@ -4,10 +4,14 @@ use convert_case::Casing;
 use proc_macro2::TokenStream;
 use quote::quote as q;
 
+
+use crate::AccessMode;
+
 use super::{TheTrait, ReceiverStyle};
 impl TheTrait {
 
-    pub(crate) fn generate_enum(&self, out: &mut TokenStream) {
+    pub(crate) fn generate_enum(&self, out: &mut TokenStream, am: AccessMode) {
+        let am = am.code();
         let enum_name = quote::format_ident!("{}Enum", self.name);
         let mut variants = TokenStream::new();
         for method in &self.methods {
@@ -25,13 +29,14 @@ impl TheTrait {
             });
         }
         out.extend(q! {
-            enum #enum_name {
+            #am enum #enum_name {
                 #variants
             }
         });
     }
 
-    pub(crate) fn generate_call_fn(&self, out: &mut TokenStream, level: ReceiverStyle) {
+    pub(crate) fn generate_call_fn(&self, out: &mut TokenStream, level: ReceiverStyle, am: AccessMode) {
+        let am = am.code();
         let enum_name = quote::format_ident!("{}Enum", self.name);
         let name = &self.name;
         let mut variants = TokenStream::new();
@@ -84,7 +89,7 @@ impl TheTrait {
 
         out.extend(q! {
             impl #enum_name {
-                fn #fnname<I: #name>(self, #o) {
+                #am fn #fnname<I: #name>(self, #o) {
                     match self {
                         #variants
                     }
@@ -92,7 +97,8 @@ impl TheTrait {
             }
         });
     }
-    pub(crate) fn generate_resultified_trait(&self, out: &mut TokenStream, level: ReceiverStyle) {
+    pub(crate) fn generate_resultified_trait(&self, out: &mut TokenStream, level: ReceiverStyle, am: AccessMode) {
+        let am = am.code();
         let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
         //let name = &self.name;
         let mut methods = TokenStream::new();
@@ -113,14 +119,15 @@ impl TheTrait {
             });
         }
         out.extend(q! {
-            trait #rt_name<E> {
+            #am trait #rt_name<E> {
                 #methods
             }
         });
     }
 
 
-    pub(crate) fn generate_resultified_proxy(&self, out: &mut TokenStream, level: ReceiverStyle) {
+    pub(crate) fn generate_proxy(&self, out: &mut TokenStream, level: ReceiverStyle, am : AccessMode) {
+        let am = am.code();
         let enum_name = quote::format_ident!("{}Enum", self.name);
         let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
         let proxy_name = quote::format_ident!("{}Proxy{}", self.name, level.identpart());
@@ -151,7 +158,7 @@ impl TheTrait {
         }
         let fn_trait = level.fn_trait();
         out.extend(q! {
-            struct #proxy_name<E, F: #fn_trait(#enum_name)-> ::std::result::Result<(), E> > (F);
+            #am struct #proxy_name<E, F: #fn_trait(#enum_name)-> ::std::result::Result<(), E> > (pub F);
 
             impl<E, F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>> #rt_name<E> for #proxy_name<E, F> {
                 #methods

@@ -1,5 +1,6 @@
 use proc_macro2::TokenStream;
 
+use crate::AccessMode;
 use crate::CallFnParams;
 
 use super::GenProxyParams;
@@ -143,6 +144,18 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
                     }
                     params.call_once = Some(CallFnParams::default());
                     current_callfn = params.call_once.as_mut();
+                }
+                "pub" => {
+                    if params.access_mode != AccessMode::Priv {
+                        panic!("Duplicate `pub` or `pub_crate`");
+                    }
+                    params.access_mode = AccessMode::Pub;
+                }
+                "pub_crate" => {
+                    if params.access_mode != AccessMode::Priv {
+                        panic!("Duplicate `pub` or `pub_crate`");
+                    }
+                    params.access_mode = AccessMode::PubCrate;
                 }
                 t => panic!("This option (`{}`) is not supported", t),
             },
