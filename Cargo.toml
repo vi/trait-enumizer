@@ -1,21 +1,2 @@
-[package]
-name = "trait-enumizer"
-version = "0.1.0"
-edition = "2021"
-
-[lib]
-proc-macro = true
-
-[dependencies]
-convert_case = "0.5.0"
-darling = "0.13.1"
-proc-macro2 = "1.0.36"
-quote = "1.0.15"
-syn = {version="1.0.86",features=["full"]}
-
-[dev-dependencies]
-catty = "0.1.4"
-crossbeam-channel = "0.5.2"
-flume = "0.10.11"
-futures = "0.3.21"
-tokio = "1.17.0"
+[workspace]
+members = ["crates/*"]

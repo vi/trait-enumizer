@@ -1,0 +1,14 @@
+[package]
+name = "trait-enumizer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+trait-enumizer-derive = {path = "../trait-enumizer-derive"}
+
+[dev-dependencies]
+catty = "0.1.4"
+crossbeam-channel = "0.5.2"
+flume = "0.10.11"
+futures = "0.3.21"
+tokio = "1.17.0"

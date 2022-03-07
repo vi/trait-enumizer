@@ -373,15 +373,22 @@ name = "trait-enumizer"
 version = "0.1.0"
 dependencies = [
  "catty",
- "convert_case",
  "crossbeam-channel",
- "darling",
  "flume",
  "futures",
+ "tokio",
+ "trait-enumizer-derive",
+]
+
+[[package]]
+name = "trait-enumizer-derive"
+version = "0.1.0"
+dependencies = [
+ "convert_case",
+ "darling",
  "proc-macro2",
  "quote",
  "syn",
- "tokio",
 ]
 
 [[package]]
