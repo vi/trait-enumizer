@@ -2,7 +2,7 @@ use crate::{Method, Argument};
 
 use super::{TheTrait, ReceiverStyle};
 impl TheTrait {
-    pub(crate) fn parse(item: syn::ItemTrait) -> TheTrait {
+    pub(crate) fn parse(item: syn::ItemTrait, returnval: bool) -> TheTrait {
         let mut methods = Vec::with_capacity(item.items.len());
 
         for x in item.items {
@@ -27,13 +27,18 @@ impl TheTrait {
                     if sig.variadic.is_some() {
                         panic!("Trait-enumizer does not support variadics")
                     }
-                    if !matches!(sig.output, syn::ReturnType::Default) {
-                        panic!("Trait-enumizer does not yet support return values in methods")
+                    if !returnval && !matches!(sig.output, syn::ReturnType::Default) {
+                        panic!("Specify `returnval` parameter to handle methods with return types.")
                     }
 
                     let mut args = Vec::with_capacity(sig.inputs.len());
 
                     let mut receiver_style = None;
+
+                    let ret = match sig.output {
+                        syn::ReturnType::Default => None,
+                        syn::ReturnType::Type(_, t) => Some(*t),
+                    };
 
                     for inp in sig.inputs {
                         match inp {
@@ -57,6 +62,11 @@ impl TheTrait {
                                         if pi.by_ref.is_some() {
                                             panic!("Trait-enumizer does not support `ref` in argument names");
                                         }
+                                        if returnval {
+                                            if pi.ident.to_string() == "ret" {
+                                                panic!("In `returnval` mode, method's arguments cannot be named literally `ret`. Rename it away in `{}`.", sig.ident);
+                                            }
+                                        }
                                         args.push(Argument { name: pi.ident, ty: *arg.ty });
                                     }
                                     _ => panic!("Trait-enumizer does not support method arguments that are patterns, not just simple identifiers"),
@@ -73,6 +83,7 @@ impl TheTrait {
                         args,
                         name: sig.ident,
                         receiver_style: receiver_style.unwrap(),
+                        ret,
                     };
                     methods.push(method);
                 }

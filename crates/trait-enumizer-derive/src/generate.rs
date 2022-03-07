@@ -1,16 +1,17 @@
-
-
 use convert_case::Casing;
 use proc_macro2::TokenStream;
 use quote::quote as q;
 
-
 use crate::AccessMode;
 
-use super::{TheTrait, ReceiverStyle};
+use super::{ReceiverStyle, TheTrait};
 impl TheTrait {
-
-    pub(crate) fn generate_enum(&self, out: &mut TokenStream, am: AccessMode) {
+    pub(crate) fn generate_enum(
+        &self,
+        out: &mut TokenStream,
+        am: AccessMode,
+        returnval_mode: bool,
+    ) {
         let am = am.code();
         let enum_name = quote::format_ident!("{}Enum", self.name);
         let mut variants = TokenStream::new();
@@ -24,18 +25,37 @@ impl TheTrait {
                     #n : #t,
                 });
             }
+            if let Some(rv) = &method.ret {
+                variant_params.extend(q!{
+                    ret : CC::Sender<#rv>,
+                });
+            }
             variants.extend(q! {
                 #variant_name { #variant_params },
             });
         }
+        let generics = if returnval_mode {
+            q!{<CC: ::trait_enumizer::SyncChannelClass>}
+        } else {
+            q!{}
+        };
         out.extend(q! {
-            #am enum #enum_name {
+            #am enum #enum_name #generics {
                 #variants
             }
         });
     }
 
-    pub(crate) fn generate_call_fn(&self, out: &mut TokenStream, level: ReceiverStyle, am: AccessMode) {
+    pub(crate) fn generate_call_fn(
+        &self,
+        out: &mut TokenStream,
+        level: ReceiverStyle,
+        am: AccessMode,
+        returnval_mode: bool,
+    ) {
+        if returnval_mode {
+            return;
+        }
         let am = am.code();
         let enum_name = quote::format_ident!("{}Enum", self.name);
         let name = &self.name;
@@ -65,26 +85,30 @@ impl TheTrait {
                 (ReceiverStyle::Ref, _) => false,
             };
             let action = if can_do_it {
-                q!{o.#method_name(#variant_params)}
+                q! {o.#method_name(#variant_params)}
             } else {
-                let literal1 = proc_macro2::Literal::string(&format!("{}Enum::{}", self.name, level.call_fn_name()));
+                let literal1 = proc_macro2::Literal::string(&format!(
+                    "{}Enum::{}",
+                    self.name,
+                    level.call_fn_name()
+                ));
                 let literal2 = proc_macro2::Literal::string(&method_name.to_string());
-                q!{panic!("Cannot call `{}` from `{}` due to incompative `self` access mode", #literal2, #literal1)}
+                q! {panic!("Cannot call `{}` from `{}` due to incompative `self` access mode", #literal2, #literal1)}
             };
             variants.extend(q! {
                 #enum_name::#variant_name { #variant_params } => #action,
             });
         }
-       
+
         let fnname = match level {
-            ReceiverStyle::Move => q!{call_once},
-            ReceiverStyle::Mut => q!{call_mut},
-            ReceiverStyle::Ref => q!{call},
+            ReceiverStyle::Move => q! {call_once},
+            ReceiverStyle::Mut => q! {call_mut},
+            ReceiverStyle::Ref => q! {call},
         };
-        let o =  match level {
-            ReceiverStyle::Move => q!{mut o: I},
-            ReceiverStyle::Mut => q!{o: &mut I},
-            ReceiverStyle::Ref => q!{o: &I},
+        let o = match level {
+            ReceiverStyle::Move => q! {mut o: I},
+            ReceiverStyle::Mut => q! {o: &mut I},
+            ReceiverStyle::Ref => q! {o: &I},
         };
 
         out.extend(q! {
@@ -97,7 +121,16 @@ impl TheTrait {
             }
         });
     }
-    pub(crate) fn generate_resultified_trait(&self, out: &mut TokenStream, level: ReceiverStyle, am: AccessMode) {
+    pub(crate) fn generate_resultified_trait(
+        &self,
+        out: &mut TokenStream,
+        level: ReceiverStyle,
+        am: AccessMode,
+        returnval_mode: bool,
+    ) {
+        if returnval_mode {
+            return;
+        }
         let am = am.code();
         let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
         //let name = &self.name;
@@ -125,8 +158,14 @@ impl TheTrait {
         });
     }
 
-
-    pub(crate) fn generate_proxy(&self, out: &mut TokenStream, level: ReceiverStyle, am : AccessMode) {
+    pub(crate) fn generate_proxy(
+        &self,
+        out: &mut TokenStream,
+        level: ReceiverStyle,
+        am: AccessMode,
+        returnval_mode: bool,
+    ) {
+        if returnval_mode { return }
         let am = am.code();
         let enum_name = quote::format_ident!("{}Enum", self.name);
         let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
@@ -198,7 +237,13 @@ impl TheTrait {
         });
     }
 
-    pub(crate) fn generate_unwrapping_impl(&self, out: &mut TokenStream, level: ReceiverStyle) {
+    pub(crate) fn generate_unwrapping_impl(
+        &self,
+        out: &mut TokenStream,
+        level: ReceiverStyle,
+        returnval_mode: bool,
+    ) {
+        if returnval_mode { return }
         let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
         let proxy_name = quote::format_ident!("{}Proxy{}", self.name, level.identpart());
         let fn_trait = level.fn_trait();
@@ -221,7 +266,7 @@ impl TheTrait {
                 });
             }
             let slf = method.receiver_style.ts();
-            let can_call = match(method.receiver_style, level) {
+            let can_call = match (method.receiver_style, level) {
                 (ReceiverStyle::Move, _) => true,
                 (ReceiverStyle::Mut, ReceiverStyle::Move) => false,
                 (ReceiverStyle::Mut, ReceiverStyle::Mut) => true,
@@ -231,10 +276,10 @@ impl TheTrait {
                 (ReceiverStyle::Ref, ReceiverStyle::Ref) => true,
             };
             if can_call {
-                let slf2 = match(method.receiver_style, level) {
-                    (ReceiverStyle::Move, ReceiverStyle::Ref) => q!{&self},
-                    (ReceiverStyle::Move, ReceiverStyle::Mut) => q!{&mut self},
-                    _ => q!{self},
+                let slf2 = match (method.receiver_style, level) {
+                    (ReceiverStyle::Move, ReceiverStyle::Ref) => q! {&self},
+                    (ReceiverStyle::Move, ReceiverStyle::Mut) => q! {&mut self},
+                    _ => q! {self},
                 };
                 methods.extend(q! {
                     fn #method_name(#slf, #args_with_types ) {

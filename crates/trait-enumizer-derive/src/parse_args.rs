@@ -157,6 +157,12 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
                     }
                     params.access_mode = AccessMode::PubCrate;
                 }
+                "returnval" => {
+                    if params.returnval {
+                        panic!("Duplicate `returnval`");
+                    }
+                    params.returnval = true;
+                }
                 t => panic!("This option (`{}`) is not supported", t),
             },
             proc_macro2::TokenTree::Punct(x) => {

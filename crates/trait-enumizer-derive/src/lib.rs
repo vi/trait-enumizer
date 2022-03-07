@@ -20,6 +20,7 @@ struct Method {
     name: Ident,
     receiver_style: ReceiverStyle,
     args: Vec<Argument>,
+    ret: Option<syn::Type>, 
 }
 
 impl Method {
@@ -90,6 +91,7 @@ struct Params {
     call_mut: Option<CallFnParams>,
     call_once: Option<CallFnParams>,
     access_mode: AccessMode,
+    returnval: bool,
 }
 
 #[proc_macro_attribute]
@@ -104,69 +106,78 @@ pub fn enumizer(
 
     let mut ret = input.clone();
     let tra: syn::ItemTrait = syn::parse2(input).unwrap();
-    let thetrait = TheTrait::parse(tra);
+    let thetrait = TheTrait::parse(tra, params.returnval);
     //dbg!(thetrait);
-    thetrait.generate_enum(&mut ret, params.access_mode);
+    thetrait.generate_enum(&mut ret, params.access_mode, params.returnval);
 
 
     let caller_inconv = thetrait.receiver_style_that_is_the_most_inconvenient_for_caller();
 
     if let Some(_g) = params.call_once {
-        thetrait.generate_call_fn(&mut ret, ReceiverStyle::Move, params.access_mode);
+        thetrait.generate_call_fn(&mut ret, ReceiverStyle::Move, params.access_mode, params.returnval);
     }
     if let Some(g) = params.call_mut {
         if caller_inconv == ReceiverStyle::Move && ! g.allow_panic {
             panic!("Cannot generate `call_mut` function because of trait have `self` methods. Use `call_mut(allow_panic)` to override.");
         }
-        thetrait.generate_call_fn(&mut ret, ReceiverStyle::Mut, params.access_mode);
+        thetrait.generate_call_fn(&mut ret, ReceiverStyle::Mut, params.access_mode, params.returnval);
     }
     if let Some(g) = params.call_ref {
         if caller_inconv != ReceiverStyle::Ref && ! g.allow_panic {
             panic!("Cannot generate `call` function because of trait have non-`&self` methods. Use `call(allow_panic)` to override.");
         }
-        thetrait.generate_call_fn(&mut ret, ReceiverStyle::Ref, params.access_mode);
+        thetrait.generate_call_fn(&mut ret, ReceiverStyle::Ref, params.access_mode, params.returnval);
     }
 
     let callee_inconv = thetrait.receiver_style_that_is_the_most_inconvenient_for_callee();
 
     if let Some(g) = params.ref_proxy {
-        thetrait.generate_resultified_trait(&mut ret, ReceiverStyle::Ref, params.access_mode);
-        thetrait.generate_proxy(&mut ret, ReceiverStyle::Ref, params.access_mode);
+        thetrait.generate_resultified_trait(&mut ret, ReceiverStyle::Ref, params.access_mode, params.returnval);
+        thetrait.generate_proxy(&mut ret, ReceiverStyle::Ref, params.access_mode, params.returnval);
         if g.gen_infallible {
+            if params.returnval {
+                panic!("infallible_impl and returnval are incompatible");
+            }
             thetrait.generate_infallible_impl(&mut ret, ReceiverStyle::Ref);
         }
         if g.gen_unwrapping || g.gen_unwrapping_and_panicking {
-            thetrait.generate_unwrapping_impl(&mut ret, ReceiverStyle::Ref);
+            thetrait.generate_unwrapping_impl(&mut ret, ReceiverStyle::Ref, params.returnval);
         }
     }
     if let Some(g) = params.mut_proxy {
-        thetrait.generate_resultified_trait(&mut ret, ReceiverStyle::Mut, params.access_mode);
-        thetrait.generate_proxy(&mut ret, ReceiverStyle::Mut, params.access_mode);
+        thetrait.generate_resultified_trait(&mut ret, ReceiverStyle::Mut, params.access_mode, params.returnval);
+        thetrait.generate_proxy(&mut ret, ReceiverStyle::Mut, params.access_mode, params.returnval);
         if g.gen_infallible || g.gen_unwrapping {
             if callee_inconv == ReceiverStyle::Ref {
                 panic!("The trait contains &self methods. The mutable proxy cannot implement it. Use `unwrapping_and_panicking_impl` to force generation and retain only some methods");
             }
         }
         if g.gen_infallible {
+            if params.returnval {
+                panic!("infallible_impl and returnval are incompatible");
+            }
             thetrait.generate_infallible_impl(&mut ret, ReceiverStyle::Mut);
         }
         if g.gen_unwrapping || g.gen_unwrapping_and_panicking {
-            thetrait.generate_unwrapping_impl(&mut ret, ReceiverStyle::Mut);
+            thetrait.generate_unwrapping_impl(&mut ret, ReceiverStyle::Mut, params.returnval);
         }
     }
     if let Some(g) = params.once_proxy {
-        thetrait.generate_resultified_trait(&mut ret, ReceiverStyle::Move, params.access_mode);
-        thetrait.generate_proxy(&mut ret, ReceiverStyle::Move, params.access_mode);
+        thetrait.generate_resultified_trait(&mut ret, ReceiverStyle::Move, params.access_mode, params.returnval);
+        thetrait.generate_proxy(&mut ret, ReceiverStyle::Move, params.access_mode, params.returnval);
         if g.gen_infallible || g.gen_unwrapping {
             if callee_inconv != ReceiverStyle::Move {
                 panic!("The trait contains `&self` or `&mut self` methods. The once proxy cannot implement it - only for traits with solely `self` methods. Use `unwrapping_and_panicking_impl` to force generation and retain only some methods");
             }
         }
         if g.gen_infallible {
+            if params.returnval {
+                panic!("infallible_impl and returnval are incompatible");
+            }
             thetrait.generate_infallible_impl(&mut ret, ReceiverStyle::Move);
         }
         if g.gen_unwrapping || g.gen_unwrapping_and_panicking {
-            thetrait.generate_unwrapping_impl(&mut ret, ReceiverStyle::Move);
+            thetrait.generate_unwrapping_impl(&mut ret, ReceiverStyle::Move, params.returnval);
         }
     }
 
