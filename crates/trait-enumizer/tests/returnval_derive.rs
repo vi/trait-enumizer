@@ -1,3 +1,4 @@
+#![cfg(feature="returnval")]
 #![feature(generic_associated_types)]
 
 #[trait_enumizer::enumizer(returnval,call,ref_proxy(unwrapping_impl))]
