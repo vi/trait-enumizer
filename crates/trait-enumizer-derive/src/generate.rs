@@ -116,7 +116,7 @@ impl TheTrait {
             let action = if can_do_it {
                 if returnval_mode {
                     if method.ret.is_some() {
-                        q! { Ok(CC::send(ret, o.#method_name(#variant_params))?)  }
+                        q! { Ok(CC::send(cc, ret, o.#method_name(#variant_params))?)  }
                     } else {
                         q! {Ok(o.#method_name(#variant_params))}
                     }
@@ -143,6 +143,11 @@ impl TheTrait {
             ReceiverStyle::Mut => q! {o: &mut I},
             ReceiverStyle::Ref => q! {o: &I},
         };
+        let cc = if returnval_mode {
+            q!{, cc : &CC}
+        } else {
+            q!{}
+        };
 
         let generic1 = if returnval_mode {
             q!{<CC: ::trait_enumizer::SyncChannelClass>}
@@ -161,7 +166,7 @@ impl TheTrait {
         };
         out.extend(q! {
             impl #generic1 #enum_name #generic2 {
-                #am fn #fnname<I: #name>(self, #o) #rett {
+                #am fn #fnname<I: #name>(self, #o #cc) #rett {
                     match self {
                         #variants
                     }
@@ -249,7 +254,7 @@ impl TheTrait {
                     fn #rt_method_name(#slf, #args_with_types ) -> ::std::result::Result<::std::result::Result<#rt, CC::RecvError>, E> {
                         let (tx, rx) = self.1.create();
                         self.0(#enum_name::#variant_name { #args_without_types ret: tx })?;
-                        Ok(CC::recv(rx))
+                        Ok(CC::recv(&self.1, rx))
                     }
                 });
             } else {

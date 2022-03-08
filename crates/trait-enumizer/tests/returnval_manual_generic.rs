@@ -34,10 +34,10 @@ enum MyIfaceEnum<CC: SyncChannelClass> {
 }
 
 impl<CC: SyncChannelClass> MyIfaceEnum<CC> {
-    fn try_call<I: MyIface>(self, o: &I) -> Result<(), CC::SendError> {
+    fn try_call<I: MyIface>(self, o: &I, cc: &CC) -> Result<(), CC::SendError> {
         match self {
-            MyIfaceEnum::Foo { ret } => Ok(CC::send(ret, o.foo())?),
-            MyIfaceEnum::Bar { x, ret } => Ok(CC::send(ret, o.bar(x))?),
+            MyIfaceEnum::Foo { ret } => Ok(CC::send(cc, ret, o.foo())?),
+            MyIfaceEnum::Bar { x, ret } => Ok(CC::send(cc, ret, o.bar(x))?),
             MyIfaceEnum::Baz { y, z } => Ok(o.baz(y, z)),
         }
     }
@@ -61,13 +61,13 @@ where
     fn try_foo(&self) -> Result<Result<String, CC::RecvError>, E> {
         let (tx, rx) = self.1.create();
         self.0(MyIfaceEnum::Foo { ret: tx })?;
-        Ok(CC::recv(rx))
+        Ok(CC::recv(&self.1, rx))
     }
 
     fn try_bar(&self, x: i32) -> Result<Result<i32, CC::RecvError>, E> {
         let (tx, rx) = self.1.create();
         self.0(MyIfaceEnum::Bar { x, ret: tx })?;
-        Ok(CC::recv(rx))
+        Ok(CC::recv(&self.1, rx))
     }
 
     fn try_baz(&self, y: String, z: Vec<u8>) -> Result<(), E> {
@@ -102,7 +102,9 @@ use trait_enumizer::{SyncChannelClass, FlumeChannelClass};
 #[test]
 fn simple() {
     let o = Implementor {};
-    let p = MyIfaceProxy::<_, _, _>(|c| c.try_call(&o), FlumeChannelClass);
+    let cc = FlumeChannelClass;
+    let cc2 = FlumeChannelClass;
+    let p = MyIfaceProxy::<_, _, _>(move |c| c.try_call(&o, &cc2), cc);
     dbg!(p.foo());
     dbg!(p.bar(4));
 }
@@ -111,13 +113,15 @@ fn simple() {
 #[test]
 fn threaded() {
     let (tx,rx) = flume::bounded::<MyIfaceEnum<FlumeChannelClass>>(1);
+    let cc = FlumeChannelClass;
     std::thread::spawn(move || {
+        let cc = FlumeChannelClass;
         let o = Implementor {};
         for msg in rx {
-            msg.try_call(&o).unwrap();
+            msg.try_call(&o, &cc).unwrap();
         }
     });
-    let p = MyIfaceProxy::<_, _, _>(|c| tx.send(c), FlumeChannelClass);
+    let p = MyIfaceProxy::<_, _, _>(|c| tx.send(c), cc);
     dbg!(p.foo());
     dbg!(p.bar(4));
 }

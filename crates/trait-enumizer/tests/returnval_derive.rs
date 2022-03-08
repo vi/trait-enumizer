@@ -31,7 +31,7 @@ use trait_enumizer::{FlumeChannelClass};
 #[test]
 fn simple() {
     let o = Implementor {};
-    let p = MyIfaceProxy::<_, _, _>(|c| c.try_call(&o), FlumeChannelClass);
+    let p = MyIfaceProxy::<_, _, _>(|c| c.try_call(&o, &FlumeChannelClass), FlumeChannelClass);
     dbg!(p.foo());
     dbg!(p.bar(4));
 }
@@ -42,8 +42,9 @@ fn threaded() {
     let (tx,rx) = flume::bounded::<MyIfaceEnum<FlumeChannelClass>>(1);
     std::thread::spawn(move || {
         let o = Implementor {};
+        let cc = FlumeChannelClass;
         for msg in rx {
-            msg.try_call(&o).unwrap();
+            msg.try_call(&o, &cc).unwrap();
         }
     });
     let p = MyIfaceProxy::<_, _, _>(|c| tx.send(c), FlumeChannelClass);

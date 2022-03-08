@@ -6,8 +6,8 @@ pub trait SyncChannelClass {
     type SendError;
     type RecvError;
     fn create<T>(&self) -> (Self::Sender<T>, Self::Receiver<T>);
-    fn send<T>(s: Self::Sender<T>, msg: T) -> Result<(), Self::SendError>;
-    fn recv<T>(r: Self::Receiver<T>) -> Result<T, Self::RecvError>;
+    fn send<T>(&self, s: Self::Sender<T>, msg: T) -> Result<(), Self::SendError>;
+    fn recv<T>(&self, r: Self::Receiver<T>) -> Result<T, Self::RecvError>;
 }
 
 #[derive(Debug,Clone, Copy,PartialEq, Eq, PartialOrd, Ord,Hash)]
@@ -36,12 +36,12 @@ impl SyncChannelClass for FlumeChannelClass {
         flume::bounded(1)
     }
 
-    fn send<T>(s: Self::Sender<T>, msg: T) -> Result<(), Self::SendError> {
+    fn send<T>(&self, s: Self::Sender<T>, msg: T) -> Result<(), Self::SendError> {
         s.send(msg)
             .map_err(|_| FailedToSendReturnValue)
     }
 
-    fn recv<T>(r: Self::Receiver<T>) -> Result<T, Self::RecvError> {
+    fn recv<T>(&self, r: Self::Receiver<T>) -> Result<T, Self::RecvError> {
         r.recv()
     }
 }
@@ -62,11 +62,11 @@ impl SyncChannelClass for StdChannelClass {
         std::sync::mpsc::sync_channel(1)
     }
 
-    fn send<T>(s: Self::Sender<T>, msg: T) -> Result<(), Self::SendError> {
+    fn send<T>(&self, s: Self::Sender<T>, msg: T) -> Result<(), Self::SendError> {
         s.send(msg).map_err(|_|FailedToSendReturnValue)
     }
 
-    fn recv<T>(r: Self::Receiver<T>) -> Result<T, Self::RecvError> {
+    fn recv<T>(&self, r: Self::Receiver<T>) -> Result<T, Self::RecvError> {
         r.recv()
     }
 }
@@ -87,12 +87,12 @@ impl SyncChannelClass for CrossbeamChannelClass {
         crossbeam_channel::bounded(1)
     }
 
-    fn send<T>(s: Self::Sender<T>, msg: T) -> Result<(), Self::SendError> {
+    fn send<T>(&self, s: Self::Sender<T>, msg: T) -> Result<(), Self::SendError> {
         s.send(msg)
             .map_err(|_| FailedToSendReturnValue)
     }
 
-    fn recv<T>(r: Self::Receiver<T>) -> Result<T, Self::RecvError> {
+    fn recv<T>(&self, r: Self::Receiver<T>) -> Result<T, Self::RecvError> {
         r.recv()
     }
 }
