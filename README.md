@@ -22,7 +22,9 @@ Main piece of library is `enumizer` attribute macro. It should be attached to tr
     * `infallible_impl` - Make the proxy also implement the original trait, provided your sink function does not err.
     * `unwrapping_impl` - Make the proxy also implement the original trait, using `unwrap` where needed.
     * `unwrapping_and_panicking_impl` - Force proxy to implement the original trait, using `panic!()` calls where complication would fail because of ownership requirements.
-* `enum_attr` - Inject custom attribute (e.g. `derive(serde_derive::Serialize)`)  into enum declaration. Can be repeated.
+* `enum_attr` - Inject custom attribute (e.g. `enum_attr[derive(serde_derive::Serialize)]`)  into enum declaration. Can be repeated. You need to use square brackets for this.
+
+Trait's functions and their arguments may be annotated with `#[enumizer_enum_attr[...]]` to become enum variants' and their fields' attributes. Use `#[enumizer_return_attr[...]]` to attached attributes to return value's fields. 
 
 Example of attributes syntax:
 
@@ -35,6 +37,6 @@ To understand how the crate functions, you can view some test files:
 * [`simple_derive.rs`](crates/trait-enumizer/tests/simple_derive.rs) - Simple demo.
 * [`simple_manual.rs`](crates/trait-enumizer/tests/simple_manual.rs) - Expanded implementation of the demo above.
 * [`mutable_derive.rs`](crates/trait-enumizer/tests/mutable_derive.rs), [`mutable_manual.rs`](crates/trait-enumizer/tests/mutable_manual.rs), [`move_derive.rs`](crates/trait-enumizer/tests/move_derive.rs), [`move_manual.rs`](crates/trait-enumizer/tests/move_manual.rs) - the same, but for mut and once cases.
-* [`mixed.rs`](crates/trait-enumizer/tests/mixed.rs) - Showcases some other features, also uses threading to demonstrates how to interact with channels (using [flume](https://crates.io/crates/flume) as example).
+* [`mixed.rs`](crates/trait-enumizer/tests/mixed.rs) - Showcases some other features, also uses threading to demonstrates how to interact with channels (using [flume](https://crates.io/crates/flume) as example). Also showcases injecting custom derive into the generated enum.
 * [`returnval_derive.rs`](crates/trait-enumizer/tests/returnval_derive.rs), [`returnval_manual_generic.rs`](crates/trait-enumizer/tests/returnval_manual_generic.rs) - Tricker mode for handling return values.
 * [`returnval_manual_flume.rs`](crates/trait-enumizer/tests/returnval_manual_flume.rs) - Original version without the channel abstraction, hard coded for [flume](https://crates.io/crates/flume) instead.

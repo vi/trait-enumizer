@@ -6,6 +6,7 @@ use syn::Ident;
 struct Argument {
     name: Ident,
     ty: syn::Type,
+    enum_attr: Vec<proc_macro2::Group>,
 }
 
 
@@ -20,7 +21,9 @@ struct Method {
     name: Ident,
     receiver_style: ReceiverStyle,
     args: Vec<Argument>,
-    ret: Option<syn::Type>, 
+    ret: Option<syn::Type>,
+    enum_attr: Vec<proc_macro2::Group>,
+    return_attr: Vec<proc_macro2::Group>,
 }
 
 impl Method {
@@ -105,9 +108,10 @@ pub fn enumizer(
 
     let params =  parse_args::parse_args(attrs);
 
-    let mut ret = input.clone();
-    let tra: syn::ItemTrait = syn::parse2(input).unwrap();
-    let thetrait = TheTrait::parse(tra, params.returnval);
+    let mut ret = TokenStream::new();
+    let mut tra: syn::ItemTrait = syn::parse2(input).unwrap();
+    let thetrait = TheTrait::parse(&mut tra, params.returnval);
+    ret.extend(quote::quote!{#tra});
     //dbg!(thetrait);
     thetrait.generate_enum(&mut ret, params.access_mode, params.returnval, &params.enum_attr);
 

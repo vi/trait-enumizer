@@ -2,7 +2,8 @@ mod inner {
     #[trait_enumizer::enumizer(pub_crate, call_mut(allow_panic),ref_proxy(unwrapping_impl),enum_attr[derive(serde_derive::Serialize)])]
     pub trait MyIface {
         fn increment(&mut self);
-        fn increment2(&mut self, x : i32);
+        fn increment2(&mut self, #[enumizer_enum_attr[serde(rename="www")]] x : i32);
+        #[enumizer_enum_attr[serde(rename="qqq")]]
         fn print(&self);
         fn reset(&mut self);
         fn gulp(self);

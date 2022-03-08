@@ -1,14 +1,18 @@
+use proc_macro2::TokenTree;
+
 use crate::{Method, Argument};
 
 use super::{TheTrait, ReceiverStyle};
 impl TheTrait {
-    pub(crate) fn parse(item: syn::ItemTrait, returnval: bool) -> TheTrait {
+    pub(crate) fn parse(item: &mut syn::ItemTrait, returnval: bool) -> TheTrait {
         let mut methods = Vec::with_capacity(item.items.len());
 
-        for x in item.items {
+        for x in &mut item.items {
             match x {
                 syn::TraitItem::Method(m) => {
-                    let sig = m.sig;
+                    let mut enum_attr = vec![];
+                    let mut return_attr = vec![];
+                    let sig = &mut m.sig;
                     if sig.constness.is_some() {
                         panic!("Trait-enumizer does not support const");
                     }
@@ -30,20 +34,37 @@ impl TheTrait {
                     if !returnval && !matches!(sig.output, syn::ReturnType::Default) {
                         panic!("Specify `returnval` parameter to handle methods with return types.")
                     }
+                    m.attrs.retain(|a| match a.path.get_ident() {
+                        Some(x) if x == "enumizer_enum_attr" || x == "enumizer_return_attr" => {
+                            let g = match a.tokens.clone().into_iter().next() {
+                                Some(TokenTree::Group(g)) => {
+                                    g
+                                }
+                                _ => panic!("Input of `enumizer_{{enum|return}}_attr` should be single [...] group"),
+                            };
+                            match x {
+                                x if x == "enumizer_enum_attr" => enum_attr.push(g),
+                                x if x == "enumizer_return_attr" => return_attr.push(g),
+                                _ => unreachable!(),
+                            }
+                            false
+                        }
+                        _ => true,
+                    });
 
                     let mut args = Vec::with_capacity(sig.inputs.len());
 
                     let mut receiver_style = None;
 
-                    let ret = match sig.output {
+                    let ret = match &sig.output {
                         syn::ReturnType::Default => None,
-                        syn::ReturnType::Type(_, t) => Some(*t),
+                        syn::ReturnType::Type(_, t) => Some(*t.clone()),
                     };
 
-                    for inp in sig.inputs {
+                    for inp in &mut sig.inputs {
                         match inp {
                             syn::FnArg::Receiver(r) => {
-                                receiver_style = if let Some(rr) = r.reference {
+                                receiver_style = if let Some(rr) = &r.reference {
                                     if rr.1.is_some() {
                                         panic!("Trait-enumizer does not support explicit lifetimes");
                                     }
@@ -57,7 +78,20 @@ impl TheTrait {
                                 }
                             }
                             syn::FnArg::Typed(arg) => {
-                                match *arg.pat {
+                                let mut enum_attr = vec![];
+                                arg.attrs.retain(|a| match a.path.get_ident() {
+                                    Some(x) if x == "enumizer_enum_attr" => {
+                                        match a.tokens.clone().into_iter().next() {
+                                            Some(TokenTree::Group(g)) => {
+                                                enum_attr.push(g);
+                                            }
+                                            _ => panic!("Input of `enumizer_enum_attr` should be a single [...] group"),
+                                        }
+                                        false
+                                    }
+                                    _ => true,
+                                });
+                                match &*arg.pat {
                                     syn::Pat::Ident(pi) => {
                                         if pi.by_ref.is_some() {
                                             panic!("Trait-enumizer does not support `ref` in argument names");
@@ -67,7 +101,7 @@ impl TheTrait {
                                                 panic!("In `returnval` mode, method's arguments cannot be named literally `ret`. Rename it away in `{}`.", sig.ident);
                                             }
                                         }
-                                        args.push(Argument { name: pi.ident, ty: *arg.ty });
+                                        args.push(Argument { name: pi.ident.clone(), ty: *arg.ty.clone(), enum_attr });
                                     }
                                     _ => panic!("Trait-enumizer does not support method arguments that are patterns, not just simple identifiers"),
                                 }
@@ -81,9 +115,11 @@ impl TheTrait {
 
                     let method = Method {
                         args,
-                        name: sig.ident,
+                        name: sig.ident.clone(),
                         receiver_style: receiver_style.unwrap(),
                         ret,
+                        enum_attr,
+                        return_attr,
                     };
                     methods.push(method);
                 }
@@ -101,7 +137,7 @@ impl TheTrait {
         }
 
         TheTrait {
-            name: item.ident,
+            name: item.ident.clone(),
             methods,
         }
     }

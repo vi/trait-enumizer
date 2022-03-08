@@ -22,17 +22,34 @@ impl TheTrait {
             for arg in &method.args {
                 let n = &arg.name;
                 let t = &arg.ty;
+                let mut a = TokenStream::new();
+                for aa in &arg.enum_attr {
+                    a.extend(q!{# #aa});
+                }
                 variant_params.extend(q! {
-                    #n : #t,
+                    #a #n : #t,
                 });
             }
             if let Some(rv) = &method.ret {
+                let mut ra = TokenStream::new();
+                for aa in &method.return_attr {
+                    ra.extend(q!{# #aa});
+                }
                 variant_params.extend(q!{
-                    ret : CC::Sender<#rv>,
+                    #ra ret : CC::Sender<#rv>,
                 });
+            } else {
+                if ! method.return_attr.is_empty() {
+                    panic!("`enumizer_return_attr[]` used in method without a return type. Add `-> ()` to force using the return channel.");
+                }
             }
+            let mut a = TokenStream::new();
+            for aa in &method.enum_attr {
+                a.extend(q!{# #aa});
+            }
+
             variants.extend(q! {
-                #variant_name { #variant_params },
+                #a #variant_name { #variant_params },
             });
         }
         let generics = if returnval_mode {
