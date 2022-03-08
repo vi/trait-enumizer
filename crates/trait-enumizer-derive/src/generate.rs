@@ -11,6 +11,7 @@ impl TheTrait {
         out: &mut TokenStream,
         am: AccessMode,
         returnval_mode: bool,
+        custom_attrs: &[proc_macro2::Group],
     ) {
         let am = am.code();
         let enum_name = quote::format_ident!("{}Enum", self.name);
@@ -39,7 +40,12 @@ impl TheTrait {
         } else {
             q!{}
         };
+        let mut customattrs = TokenStream::new();
+        for ca in custom_attrs {
+            customattrs.extend(q!{# #ca});
+        }
         out.extend(q! {
+            #customattrs
             #am enum #enum_name #generics {
                 #variants
             }

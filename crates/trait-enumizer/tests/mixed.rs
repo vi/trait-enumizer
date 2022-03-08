@@ -1,5 +1,5 @@
 mod inner {
-    #[trait_enumizer::enumizer(pub_crate, call_mut(allow_panic),ref_proxy(unwrapping_impl))]
+    #[trait_enumizer::enumizer(pub_crate, call_mut(allow_panic),ref_proxy(unwrapping_impl),enum_attr[derive(serde_derive::Serialize)])]
     pub trait MyIface {
         fn increment(&mut self);
         fn increment2(&mut self, x : i32);
@@ -41,6 +41,7 @@ fn test() {
     std::thread::spawn(move || {
         let mut o = inner::Implementor(100);
         for msg in rx {
+            eprintln!("{}", serde_json::ser::to_string(&msg).unwrap());
             msg.call_mut(&mut o);
         }
     });

@@ -22,6 +22,7 @@ Main piece of library is `enumizer` attribute macro. It should be attached to tr
     * `infallible_impl` - Make the proxy also implement the original trait, provided your sink function does not err.
     * `unwrapping_impl` - Make the proxy also implement the original trait, using `unwrap` where needed.
     * `unwrapping_and_panicking_impl` - Force proxy to implement the original trait, using `panic!()` calls where complication would fail because of ownership requirements.
+* `enum_attr` - Inject custom attribute (e.g. `derive(serde_derive::Serialize)`)  into enum declaration. Can be repeated.
 
 Example of attributes syntax:
 

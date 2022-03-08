@@ -92,6 +92,7 @@ struct Params {
     call_once: Option<CallFnParams>,
     access_mode: AccessMode,
     returnval: bool,
+    enum_attr: Vec<proc_macro2::Group>,
 }
 
 #[proc_macro_attribute]
@@ -108,7 +109,7 @@ pub fn enumizer(
     let tra: syn::ItemTrait = syn::parse2(input).unwrap();
     let thetrait = TheTrait::parse(tra, params.returnval);
     //dbg!(thetrait);
-    thetrait.generate_enum(&mut ret, params.access_mode, params.returnval);
+    thetrait.generate_enum(&mut ret, params.access_mode, params.returnval, &params.enum_attr);
 
 
     let caller_inconv = thetrait.receiver_style_that_is_the_most_inconvenient_for_caller();

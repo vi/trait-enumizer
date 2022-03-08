@@ -7,14 +7,19 @@ use super::GenProxyParams;
 
 use super::Params;
 
-
 pub(crate) fn parse_args(attrs: TokenStream) -> Params {
     let mut params = Params::default();
-    let mut current_genproxy : Option<&mut GenProxyParams> = None;
-    let mut current_callfn : Option<&mut CallFnParams> = None;
+    let mut current_genproxy: Option<&mut GenProxyParams> = None;
+    let mut current_callfn: Option<&mut CallFnParams> = None;
+    let mut custom_attr_pending = false;
     for x in attrs {
         match x {
             proc_macro2::TokenTree::Group(g) => {
+                if custom_attr_pending {
+                    params.enum_attr.push(g);
+                    custom_attr_pending = false;
+                    continue;
+                }
                 if g.delimiter() != proc_macro2::Delimiter::Parenthesis {
                     panic!("Invalid input to `enumizer` attribute macro")
                 }
@@ -63,11 +68,11 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
                             }
                         }
                     }
-                    
+
                     if ctr > 1 {
                         panic!("Choose only one of infallible, unwrapping or unwrapping-and-panicking impl");
                     }
-                } 
+                }
 
                 if let Some(cfp) = current_callfn.take() {
                     claimed = true;
@@ -97,75 +102,86 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
                             }
                         }
                     }
-                } 
-                if ! claimed {
+                }
+                if !claimed {
                     panic!("Invalid input to `enumizer` attribute macro - unexpected parentheses")
                 }
             }
-            proc_macro2::TokenTree::Ident(x) => match &*x.to_string() {
-                "ref_proxy" => {
-                    if params.ref_proxy.is_some() {
-                        panic!("Duplicate `ref_proxy`");
-                    }
-                    params.ref_proxy = Some(GenProxyParams::default());
-                    current_genproxy = params.ref_proxy.as_mut();
+            proc_macro2::TokenTree::Ident(x) => {
+                if custom_attr_pending {
+                    panic!("custom_attr should be followed by a group");
                 }
-                "mut_proxy" => {
-                    if params.mut_proxy.is_some() {
-                        panic!("Duplicate `ref_proxy`");
+                match &*x.to_string() {
+                    "ref_proxy" => {
+                        if params.ref_proxy.is_some() {
+                            panic!("Duplicate `ref_proxy`");
+                        }
+                        params.ref_proxy = Some(GenProxyParams::default());
+                        current_genproxy = params.ref_proxy.as_mut();
                     }
-                    params.mut_proxy = Some(GenProxyParams::default());
-                    current_genproxy = params.mut_proxy.as_mut();
-                }
-                "once_proxy" => {
-                    if params.once_proxy.is_some() {
-                        panic!("Duplicate `ref_proxy`");
+                    "mut_proxy" => {
+                        if params.mut_proxy.is_some() {
+                            panic!("Duplicate `ref_proxy`");
+                        }
+                        params.mut_proxy = Some(GenProxyParams::default());
+                        current_genproxy = params.mut_proxy.as_mut();
                     }
-                    params.once_proxy = Some(GenProxyParams::default());
-                    current_genproxy = params.once_proxy.as_mut();
-                }
-                "call" => {
-                    if params.call_ref.is_some() {
-                        panic!("Duplicate `call`");
+                    "once_proxy" => {
+                        if params.once_proxy.is_some() {
+                            panic!("Duplicate `ref_proxy`");
+                        }
+                        params.once_proxy = Some(GenProxyParams::default());
+                        current_genproxy = params.once_proxy.as_mut();
                     }
-                    params.call_ref = Some(CallFnParams::default());
-                    current_callfn = params.call_ref.as_mut();
-                }
-                "call_mut" => {
-                    if params.call_mut.is_some() {
-                        panic!("Duplicate `call`");
+                    "call" => {
+                        if params.call_ref.is_some() {
+                            panic!("Duplicate `call`");
+                        }
+                        params.call_ref = Some(CallFnParams::default());
+                        current_callfn = params.call_ref.as_mut();
                     }
-                    params.call_mut = Some(CallFnParams::default());
-                    current_callfn = params.call_mut.as_mut();
-                }
-                "call_once" => {
-                    if params.call_once.is_some() {
-                        panic!("Duplicate `call`");
+                    "call_mut" => {
+                        if params.call_mut.is_some() {
+                            panic!("Duplicate `call`");
+                        }
+                        params.call_mut = Some(CallFnParams::default());
+                        current_callfn = params.call_mut.as_mut();
                     }
-                    params.call_once = Some(CallFnParams::default());
-                    current_callfn = params.call_once.as_mut();
-                }
-                "pub" => {
-                    if params.access_mode != AccessMode::Priv {
-                        panic!("Duplicate `pub` or `pub_crate`");
+                    "call_once" => {
+                        if params.call_once.is_some() {
+                            panic!("Duplicate `call`");
+                        }
+                        params.call_once = Some(CallFnParams::default());
+                        current_callfn = params.call_once.as_mut();
                     }
-                    params.access_mode = AccessMode::Pub;
-                }
-                "pub_crate" => {
-                    if params.access_mode != AccessMode::Priv {
-                        panic!("Duplicate `pub` or `pub_crate`");
+                    "pub" => {
+                        if params.access_mode != AccessMode::Priv {
+                            panic!("Duplicate `pub` or `pub_crate`");
+                        }
+                        params.access_mode = AccessMode::Pub;
                     }
-                    params.access_mode = AccessMode::PubCrate;
-                }
-                "returnval" => {
-                    if params.returnval {
-                        panic!("Duplicate `returnval`");
+                    "pub_crate" => {
+                        if params.access_mode != AccessMode::Priv {
+                            panic!("Duplicate `pub` or `pub_crate`");
+                        }
+                        params.access_mode = AccessMode::PubCrate;
                     }
-                    params.returnval = true;
+                    "returnval" => {
+                        if params.returnval {
+                            panic!("Duplicate `returnval`");
+                        }
+                        params.returnval = true;
+                    }
+                    "enum_attr" => {
+                        custom_attr_pending = true;
+                    }
+                    t => panic!("This option (`{}`) is not supported", t),
                 }
-                t => panic!("This option (`{}`) is not supported", t),
-            },
+            }
             proc_macro2::TokenTree::Punct(x) => {
+                if custom_attr_pending {
+                    panic!("custom_attr should be followed by a group");
+                }
                 if x.as_char() == ',' {
                     current_callfn = None;
                     current_genproxy = None;
