@@ -1,5 +1,4 @@
-#![cfg(feature="returnval")]
-#![feature(generic_associated_types)]
+#![cfg(feature="flume")]
 
 use trait_enumizer::flume_class;
 
@@ -38,8 +37,8 @@ enum MyIfaceEnum {
 impl MyIfaceEnum {
     fn try_call<I: MyIface>(self, o: &I) -> Result<(), flume_class!(SendError)> {
         match self {
-            MyIfaceEnum::Foo { ret } => Ok(flume_class!(send(ret, o.foo()))?),
-            MyIfaceEnum::Bar { x, ret } => Ok(flume_class!(send(ret, o.bar(x)))?),
+            MyIfaceEnum::Foo { ret } => Ok(flume_class!(send::<String>(ret, o.foo()))?),
+            MyIfaceEnum::Bar { x, ret } => Ok(flume_class!(send::<i32>(ret, o.bar(x)))?),
             MyIfaceEnum::Baz { y, z } => Ok(o.baz(y, z)),
         }
     }
@@ -59,15 +58,15 @@ where
     F: Fn(MyIfaceEnum) -> Result<(), E>,
 {
     fn try_foo(&self) -> Result<Result<String, flume_class!(RecvError)>, E> {
-        let (tx, rx) = flume_class!(create());
+        let (tx, rx) = flume_class!(create::<String>());
         self.0(MyIfaceEnum::Foo { ret: tx })?;
-        Ok(flume_class!(recv(rx)))
+        Ok(flume_class!(recv::<i32>(rx)))
     }
 
     fn try_bar(&self, x: i32) -> Result<Result<i32, flume_class!(RecvError)>, E> {
-        let (tx, rx) = flume_class!(create());
+        let (tx, rx) = flume_class!(create::<i32>());
         self.0(MyIfaceEnum::Bar { x, ret: tx })?;
-        Ok(flume_class!(recv(rx)))
+        Ok(flume_class!(recv::<i32>(rx)))
     }
 
     fn try_baz(&self, y: String, z: Vec<u8>) -> Result<(), E> {

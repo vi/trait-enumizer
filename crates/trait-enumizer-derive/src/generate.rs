@@ -71,6 +71,7 @@ impl TheTrait {
         level: ReceiverStyle,
         am: AccessMode,
         returnval_mode: Option<&proc_macro2::Ident>,
+        extra_arg: Option<&proc_macro2::TokenStream>,
     ) {
         let am = am.code();
         let enum_name = quote::format_ident!("{}Enum", self.name);
@@ -110,9 +111,14 @@ impl TheTrait {
                 (ReceiverStyle::Ref, _) => false,
             };
             let action = if can_do_it {
-                if method.ret.is_some() {
+                if let Some(rt) = &method.ret {
                     if let Some(m) = returnval_mode {
-                        q! { Ok(#m ! (send(ret, o.#method_name(#variant_params)))?)  }
+                        let ea = if extra_arg.is_some() {
+                            q!{, extra_arg}
+                        } else {
+                            q!{}
+                        };
+                        q! { Ok(#m ! (send::<#rt>(ret, o.#method_name(#variant_params) #ea))?)  }
                     } else {
                         unreachable!("parsing function should have already rejected this case");
                     }
@@ -149,9 +155,14 @@ impl TheTrait {
         } else {
             q!{}
         };
+        let ea = if let Some(extr) = extra_arg {
+            q!{, extra_arg : #extr}
+        } else {
+            q!{}
+        };
         out.extend(q! {
             impl #enum_name {
-                #am fn #fnname<I: #name>(self, #o) #rett {
+                #am fn #fnname<I: #name>(self, #o #ea) #rett {
                     match self {
                         #variants
                     }
@@ -209,6 +220,7 @@ impl TheTrait {
         level: ReceiverStyle,
         am: AccessMode,
         returnval_mode: Option<&proc_macro2::Ident>,
+        extra_arg: Option<&proc_macro2::TokenStream>,
     ) {
         let am = am.code();
         let enum_name = quote::format_ident!("{}Enum", self.name);
@@ -235,11 +247,16 @@ impl TheTrait {
             let slf = level.ts();
             if let Some(rt) = &method.ret {
                 let chmacro = returnval_mode.unwrap();
+                let (ea_with_comma, ea) = if let Some(_eat) = extra_arg {
+                    (q!{, self.1}, q!{self.1})
+                } else {
+                    (q!{}, q!{})
+                };
                 methods.extend(q! {
                     fn #rt_method_name(#slf, #args_with_types ) -> ::std::result::Result<::std::result::Result<#rt, #chmacro ! (RecvError)>, E> {
-                        let (tx, rx) = #chmacro !(create());
+                        let (tx, rx) = #chmacro !(create::<#rt>(#ea));
                         self.0(#enum_name::#variant_name { #args_without_types ret: tx })?;
-                        Ok(#chmacro ! (recv(rx) ) )
+                        Ok(#chmacro ! (recv::<#rt>(rx #ea_with_comma) ) )
                     }
                 });
             } else {
@@ -252,8 +269,14 @@ impl TheTrait {
         }
         let fn_trait = level.fn_trait();
 
+        let ea = if let Some(eat) = extra_arg {
+            q!{, pub #eat}
+        } else {
+            q!{}
+        };
+
         out.extend(q! {
-            #am struct #proxy_name<E, F: #fn_trait(#enum_name)-> ::std::result::Result<(), E> > (pub F);
+            #am struct #proxy_name<E, F: #fn_trait(#enum_name)-> ::std::result::Result<(), E> > (pub F #ea);
 
             impl<E, F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>> #rt_name<E> for #proxy_name<E, F> {
                 #methods

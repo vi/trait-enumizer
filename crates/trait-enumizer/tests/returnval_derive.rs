@@ -1,6 +1,4 @@
-#![cfg(feature="returnval")]
-#![feature(generic_associated_types)]
-
+#![cfg(feature="flume")]
 use trait_enumizer::flume_class;
 
 #[trait_enumizer::enumizer(returnval=flume_class,call,ref_proxy(unwrapping_impl))]
