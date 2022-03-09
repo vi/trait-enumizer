@@ -2,7 +2,9 @@
 #![feature(generic_associated_types)]
 use trait_enumizer::FlumeChannelClass;
 
-#[trait_enumizer::enumizer(returnval,call_mut,ref_proxy(unwrapping_impl),enum_attr[derive(serde_derive::Serialize,serde_derive::Deserialize)])]
+
+
+#[trait_enumizer::enumizer(returnval=my_rpc_class,call_mut,ref_proxy(unwrapping_impl),enum_attr[derive(serde_derive::Serialize,serde_derive::Deserialize)])]
 pub trait MyIface {
     fn addone(&mut self);
     fn double(&mut self);
@@ -25,36 +27,7 @@ impl MyIface for Implementor {
     }
 }
 
-struct MyRpcServerClass {
-    tx: flume::Sender<serde_json::Value>,
-}
 
-impl MyRpcServerClass {
-    fn new(client_channel: flume::Sender<serde_json::Value>) -> MyRpcServerClass {
-        MyRpcServerClass {
-            tx: client_channel,
-        }
-    }
-}
-
-impl trait_enumizer::SyncChannelClass for MyRpcServerClass {
-    type Sender<T> = usize;
-    type Receiver<T> = std::convert::Infallible;
-    type SendError = std::convert::Infallible;
-    type RecvError = std::convert::Infallible;
-
-    fn create<T>(&self) -> (Self::Sender<T>, Self::Receiver<T>) {
-        unreachable!()
-    }
-
-    fn send<T>(&self, s: Self::Sender<T>, msg: T) -> Result<(), Self::SendError> {
-        Ok(self.tx.send(serde_json::to_value(msg).unwrap()).unwrap())
-    }
-
-    fn recv<T>(&self, r: Self::Receiver<T>) -> Result<T, Self::RecvError> {
-        unreachable!()
-    }
-}
 
 #[test]
 fn test() {

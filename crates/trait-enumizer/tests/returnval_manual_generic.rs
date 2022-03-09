@@ -1,6 +1,8 @@
 #![cfg(feature="returnval")]
 #![feature(generic_associated_types)]
 
+use trait_enumizer::flume_class;
+
 trait MyIface {
     fn foo(&self) -> String;
     fn bar(&self, x: i32) -> i32;
@@ -27,47 +29,45 @@ impl MyIface for Implementor {
 
 // Begin of the part which is supposed to be auto-generated
 
-enum MyIfaceEnum<CC: SyncChannelClass> {
-    Foo { ret: CC::Sender<String> },
-    Bar { x: i32, ret: CC::Sender<i32> },
+enum MyIfaceEnum {
+    Foo { ret: flume_class!(Sender<String>) },
+    Bar { x: i32, ret: flume_class!(Sender<i32>) },
     Baz { y: String, z: Vec<u8> },
 }
 
-impl<CC: SyncChannelClass> MyIfaceEnum<CC> {
-    fn try_call<I: MyIface>(self, o: &I, cc: &CC) -> Result<(), CC::SendError> {
+impl MyIfaceEnum {
+    fn try_call<I: MyIface>(self, o: &I) -> Result<(), flume_class!(SendError)> {
         match self {
-            MyIfaceEnum::Foo { ret } => Ok(CC::send(cc, ret, o.foo())?),
-            MyIfaceEnum::Bar { x, ret } => Ok(CC::send(cc, ret, o.bar(x))?),
+            MyIfaceEnum::Foo { ret } => Ok(flume_class!(send(ret, o.foo()))?),
+            MyIfaceEnum::Bar { x, ret } => Ok(flume_class!(send(ret, o.bar(x)))?),
             MyIfaceEnum::Baz { y, z } => Ok(o.baz(y, z)),
         }
     }
 }
-trait MyIfaceResultified<E, CC: SyncChannelClass> {
-    fn try_foo(&self) -> Result<Result<String, CC::RecvError>, E>;
-    fn try_bar(&self, x: i32) -> Result<Result<i32, CC::RecvError>, E>;
+trait MyIfaceResultified<E> {
+    fn try_foo(&self) -> Result<Result<String, flume_class!(RecvError)>, E>;
+    fn try_bar(&self, x: i32) -> Result<Result<i32, flume_class!(RecvError)>, E>;
     fn try_baz(&self, y: String, z: Vec<u8>) -> Result<(), E>;
 }
 
-struct MyIfaceProxy<CC, E, F>(F, CC)
+struct MyIfaceProxy<E, F>(F)
 where
-    CC: SyncChannelClass,
-    F: Fn(MyIfaceEnum<CC>) -> Result<(), E>;
+    F: Fn(MyIfaceEnum) -> Result<(), E>;
 
-impl<CC, E, F> MyIfaceResultified<E, CC> for MyIfaceProxy<CC, E, F>
+impl<E, F> MyIfaceResultified<E> for MyIfaceProxy<E, F>
 where
-    CC: SyncChannelClass,
-    F: Fn(MyIfaceEnum<CC>) -> Result<(), E>,
+    F: Fn(MyIfaceEnum) -> Result<(), E>,
 {
-    fn try_foo(&self) -> Result<Result<String, CC::RecvError>, E> {
-        let (tx, rx) = self.1.create();
+    fn try_foo(&self) -> Result<Result<String, flume_class!(RecvError)>, E> {
+        let (tx, rx) = flume_class!(create());
         self.0(MyIfaceEnum::Foo { ret: tx })?;
-        Ok(CC::recv(&self.1, rx))
+        Ok(flume_class!(recv(rx)))
     }
 
-    fn try_bar(&self, x: i32) -> Result<Result<i32, CC::RecvError>, E> {
-        let (tx, rx) = self.1.create();
+    fn try_bar(&self, x: i32) -> Result<Result<i32, flume_class!(RecvError)>, E> {
+        let (tx, rx) = flume_class!(create());
         self.0(MyIfaceEnum::Bar { x, ret: tx })?;
-        Ok(CC::recv(&self.1, rx))
+        Ok(flume_class!(recv(rx)))
     }
 
     fn try_baz(&self, y: String, z: Vec<u8>) -> Result<(), E> {
@@ -75,12 +75,11 @@ where
     }
 }
 
-impl<CC, E, F> MyIface for MyIfaceProxy<CC, E, F>
+impl<E, F> MyIface for MyIfaceProxy<E, F>
 where
-    CC: SyncChannelClass,
-    F: Fn(MyIfaceEnum<CC>) -> Result<(), E>,
+    F: Fn(MyIfaceEnum) -> Result<(), E>,
     E :  std::fmt::Debug,
-    CC::RecvError : std::fmt::Debug,
+    flume_class!(RecvError) : std::fmt::Debug,
 {
     fn foo(&self) -> String {
         MyIfaceResultified::try_foo(self).unwrap().unwrap()
@@ -97,14 +96,11 @@ where
 
 // End of the part which is supposed to be auto-generated
 
-use trait_enumizer::{SyncChannelClass, FlumeChannelClass};
 
 #[test]
 fn simple() {
     let o = Implementor {};
-    let cc = FlumeChannelClass;
-    let cc2 = FlumeChannelClass;
-    let p = MyIfaceProxy::<_, _, _>(move |c| c.try_call(&o, &cc2), cc);
+    let p = MyIfaceProxy::<_, _>(move |c| c.try_call(&o));
     dbg!(p.foo());
     dbg!(p.bar(4));
 }
@@ -112,16 +108,14 @@ fn simple() {
 
 #[test]
 fn threaded() {
-    let (tx,rx) = flume::bounded::<MyIfaceEnum<FlumeChannelClass>>(1);
-    let cc = FlumeChannelClass;
+    let (tx,rx) = flume::bounded::<MyIfaceEnum>(1);
     std::thread::spawn(move || {
-        let cc = FlumeChannelClass;
         let o = Implementor {};
         for msg in rx {
-            msg.try_call(&o, &cc).unwrap();
+            msg.try_call(&o).unwrap();
         }
     });
-    let p = MyIfaceProxy::<_, _, _>(|c| tx.send(c), cc);
+    let p = MyIfaceProxy::<_, _>(|c| tx.send(c));
     dbg!(p.foo());
     dbg!(p.bar(4));
 }

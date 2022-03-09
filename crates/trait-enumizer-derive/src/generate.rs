@@ -10,7 +10,7 @@ impl TheTrait {
         &self,
         out: &mut TokenStream,
         am: AccessMode,
-        returnval_mode: bool,
+        returnval_mode: Option<&proc_macro2::Ident>,
         custom_attrs: &[proc_macro2::Group],
     ) {
         let am = am.code();
@@ -35,8 +35,9 @@ impl TheTrait {
                 for aa in &method.return_attr {
                     ra.extend(q!{# #aa});
                 }
+                let chmacro = returnval_mode.unwrap(); 
                 variant_params.extend(q!{
-                    #ra ret : CC::Sender<#rv>,
+                    #ra ret : #chmacro ! (Sender<#rv>),
                 });
             } else {
                 if ! method.return_attr.is_empty() {
@@ -52,18 +53,13 @@ impl TheTrait {
                 #a #variant_name { #variant_params },
             });
         }
-        let generics = if returnval_mode {
-            q!{<CC: ::trait_enumizer::SyncChannelClass>}
-        } else {
-            q!{}
-        };
         let mut customattrs = TokenStream::new();
         for ca in custom_attrs {
             customattrs.extend(q!{# #ca});
         }
         out.extend(q! {
             #customattrs
-            #am enum #enum_name #generics {
+            #am enum #enum_name {
                 #variants
             }
         });
@@ -74,7 +70,7 @@ impl TheTrait {
         out: &mut TokenStream,
         level: ReceiverStyle,
         am: AccessMode,
-        returnval_mode: bool,
+        returnval_mode: Option<&proc_macro2::Ident>,
     ) {
         let am = am.code();
         let enum_name = quote::format_ident!("{}Enum", self.name);
@@ -114,20 +110,24 @@ impl TheTrait {
                 (ReceiverStyle::Ref, _) => false,
             };
             let action = if can_do_it {
-                if returnval_mode {
-                    if method.ret.is_some() {
-                        q! { Ok(CC::send(cc, ret, o.#method_name(#variant_params))?)  }
+                if method.ret.is_some() {
+                    if let Some(m) = returnval_mode {
+                        q! { Ok(#m ! (send(ret, o.#method_name(#variant_params)))?)  }
+                    } else {
+                        unreachable!("parsing function should have already rejected this case");
+                    }
+                } else {
+                    if returnval_mode.is_none() {
+                        q! {o.#method_name(#variant_params)}
                     } else {
                         q! {Ok(o.#method_name(#variant_params))}
                     }
-                } else {
-                    q! {o.#method_name(#variant_params)}
                 }
             } else {
                 let literal1 = proc_macro2::Literal::string(&format!(
                     "{}Enum::{}",
                     self.name,
-                    level.call_fn_name(returnval_mode)
+                    level.call_fn_name(returnval_mode.is_some())
                 ));
                 let literal2 = proc_macro2::Literal::string(&method_name.to_string());
                 q! {panic!("Cannot call `{}` from `{}` due to incompative `self` access mode", #literal2, #literal1)}
@@ -137,36 +137,21 @@ impl TheTrait {
             });
         }
 
-        let fnname = level.call_fn_ts(returnval_mode);
+        let fnname = level.call_fn_ts(returnval_mode.is_some());
         let o = match level {
             ReceiverStyle::Move => q! {mut o: I},
             ReceiverStyle::Mut => q! {o: &mut I},
             ReceiverStyle::Ref => q! {o: &I},
         };
-        let cc = if returnval_mode {
-            q!{, cc : &CC}
-        } else {
-            q!{}
-        };
 
-        let generic1 = if returnval_mode {
-            q!{<CC: ::trait_enumizer::SyncChannelClass>}
-        } else {
-            q!{}
-        };
-        let generic2 = if returnval_mode {
-            q!{<CC>}
-        } else {
-            q!{}
-        };
-        let rett = if returnval_mode {
-            q!{ -> Result<(), CC::SendError>}
+        let rett = if let Some(m) = returnval_mode {
+            q!{ -> Result<(), #m ! (SendError)>}
         } else {
             q!{}
         };
         out.extend(q! {
-            impl #generic1 #enum_name #generic2 {
-                #am fn #fnname<I: #name>(self, #o #cc) #rett {
+            impl #enum_name {
+                #am fn #fnname<I: #name>(self, #o) #rett {
                     match self {
                         #variants
                     }
@@ -179,7 +164,7 @@ impl TheTrait {
         out: &mut TokenStream,
         level: ReceiverStyle,
         am: AccessMode,
-        returnval_mode: bool,
+        returnval_mode: Option<&proc_macro2::Ident>,
     ) {
         let am = am.code();
         let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
@@ -198,7 +183,11 @@ impl TheTrait {
             }
             let slf = level.ts();
             let ret = if let Some(rt) = &method.ret {
-                q!{::std::result::Result<#rt, CC::RecvError>}
+                if let Some(m) = returnval_mode {
+                    q!{::std::result::Result<#rt, #m ! ( RecvError )>}
+                } else {
+                    unreachable!("Should had been rejected earlier")
+                }
             } else {
                 q!{()}
             };
@@ -207,13 +196,8 @@ impl TheTrait {
             });
         }
 
-        let cc = if returnval_mode {
-            q!{,CC: ::trait_enumizer::SyncChannelClass}
-        } else {
-            q!{}
-        };
         out.extend(q! {
-            #am trait #rt_name<E #cc> {
+            #am trait #rt_name<E> {
                 #methods
             }
         });
@@ -224,7 +208,7 @@ impl TheTrait {
         out: &mut TokenStream,
         level: ReceiverStyle,
         am: AccessMode,
-        returnval_mode: bool,
+        returnval_mode: Option<&proc_macro2::Ident>,
     ) {
         let am = am.code();
         let enum_name = quote::format_ident!("{}Enum", self.name);
@@ -250,11 +234,12 @@ impl TheTrait {
             }
             let slf = level.ts();
             if let Some(rt) = &method.ret {
+                let chmacro = returnval_mode.unwrap();
                 methods.extend(q! {
-                    fn #rt_method_name(#slf, #args_with_types ) -> ::std::result::Result<::std::result::Result<#rt, CC::RecvError>, E> {
-                        let (tx, rx) = self.1.create();
+                    fn #rt_method_name(#slf, #args_with_types ) -> ::std::result::Result<::std::result::Result<#rt, #chmacro ! (RecvError)>, E> {
+                        let (tx, rx) = #chmacro !(create());
                         self.0(#enum_name::#variant_name { #args_without_types ret: tx })?;
-                        Ok(CC::recv(&self.1, rx))
+                        Ok(#chmacro ! (recv(rx) ) )
                     }
                 });
             } else {
@@ -266,35 +251,11 @@ impl TheTrait {
             };
         }
         let fn_trait = level.fn_trait();
-        let cc1 = if returnval_mode {
-            q!{CC: ::trait_enumizer::SyncChannelClass,}
-        } else {
-            q!{}
-        };
-        let cc2 = if returnval_mode {
-            q!{<CC>}
-        } else {
-            q!{}
-        };
-        let cc3 = if returnval_mode {
-            q!{CC,}
-        } else {
-            q!{}
-        };
-        let cc4 = if returnval_mode {
-            q!{,CC}
-        } else {
-            q!{}
-        };
-        let cc5 = if returnval_mode {
-            q!{,pub CC}
-        } else {
-            q!{}
-        };
-        out.extend(q! {
-            #am struct #proxy_name<#cc1 E, F: #fn_trait(#enum_name #cc2)-> ::std::result::Result<(), E> > (pub F #cc5);
 
-            impl<#cc1 E, F: #fn_trait(#enum_name #cc2) -> ::std::result::Result<(), E>> #rt_name<E #cc4> for #proxy_name<#cc3 E, F> {
+        out.extend(q! {
+            #am struct #proxy_name<E, F: #fn_trait(#enum_name)-> ::std::result::Result<(), E> > (pub F);
+
+            impl<E, F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>> #rt_name<E> for #proxy_name<E, F> {
                 #methods
             }
         });
@@ -336,7 +297,7 @@ impl TheTrait {
         &self,
         out: &mut TokenStream,
         level: ReceiverStyle,
-        returnval_mode: bool,
+        returnval_mode: Option<&proc_macro2::Ident>,
     ) {
         let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
         let proxy_name = quote::format_ident!("{}Proxy{}", self.name, level.identpart());
@@ -398,28 +359,13 @@ impl TheTrait {
                 });
             }
         }
-        let cc1 = if returnval_mode {
-            q!{CC: ::trait_enumizer::SyncChannelClass,}
-        } else {
-            q!{}
-        };
-        let cc2 = if returnval_mode {
-            q!{<CC>}
-        } else {
-            q!{}
-        };
-        let cc3 = if returnval_mode {
-            q!{CC,}
-        } else {
-            q!{}
-        };
-        let wh1 = if returnval_mode {
-            q!{,CC::RecvError : ::std::fmt::Debug}
+        let wh1 = if let Some(m) = returnval_mode {
+            q!{,#m ! (RecvError) : ::std::fmt::Debug}
         } else {
             q!{}
         };
         out.extend(q! {
-            impl<#cc1 E, F: #fn_trait(#enum_name #cc2) -> ::std::result::Result<(), E>>  #name for #proxy_name<#cc3 E,F> where E : ::std::fmt::Debug #wh1 {
+            impl<E, F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>>  #name for #proxy_name<E,F> where E : ::std::fmt::Debug #wh1 {
                 #methods
             }
         });
