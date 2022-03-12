@@ -1,4 +1,5 @@
 use proc_macro2::TokenStream;
+use proc_macro2::TokenTree;
 
 use crate::AccessMode;
 use crate::CallFnParams;
@@ -15,6 +16,8 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
     let mut custom_attr_pending = false;
     let mut returnval_eqsign_pending = false;
     let mut returnval_ident_pending = false;
+    let mut name_eqsign_pending = false;
+    let mut name_ident_pending = false;
     for x in attrs {
         match x {
             proc_macro2::TokenTree::Group(g) => {
@@ -23,6 +26,12 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
                 }
                 if returnval_ident_pending {
                     panic!("returnval= should be followed by ident");
+                }
+                if name_eqsign_pending {
+                    panic!("name should be followed by `=` character");
+                }
+                if name_ident_pending {
+                    panic!("name= should be followed by ident");
                 }
                 if custom_attr_pending {
                     params.enum_attr.push(g);
@@ -37,7 +46,47 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
                     claimed = true;
                     let mut ctr = 0;
                     let mut extra_arg_expecting_value = false;
+                    let mut name_eqsign_pending = false;
+                    let mut name_ident_pending = false;
+                    let mut traitname_eqsign_pending = false;
+                    let mut traitname_ident_pending = false;
                     for xx in g.stream() {
+                        if traitname_eqsign_pending || name_eqsign_pending {
+                            match xx {
+                                TokenTree::Punct(p) if p.as_char() == '=' => {
+                                   if traitname_eqsign_pending {
+                                       traitname_eqsign_pending = false;
+                                       traitname_ident_pending = true;
+                                   }
+                                   if name_eqsign_pending {
+                                       name_ident_pending = true;
+                                       name_eqsign_pending = false;
+                                   }
+                                   continue;
+                                }
+                                _ => panic!("Expected `=` character after [trait]name"),
+                            }
+                        }
+                        if name_ident_pending  {
+                            match xx {
+                                TokenTree::Ident(id) => {
+                                    cgp.name = Some(id);
+                                    name_ident_pending = false;
+                                    continue;
+                                }
+                                _ => panic!("Expected ident after name="),
+                            }
+                        }
+                        if traitname_ident_pending  {
+                            match xx {
+                                TokenTree::Ident(id) => {
+                                    cgp.traitname = Some(id);
+                                    traitname_ident_pending = false;
+                                    continue;
+                                }
+                                _ => panic!("Expected ident after traitname="),
+                            }
+                        }
                         if extra_arg_expecting_value {
                             match xx {
                                 proc_macro2::TokenTree::Group(g) => {
@@ -85,6 +134,18 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
                                     }
                                     extra_arg_expecting_value = true;
                                 }
+                                "name" => {
+                                    if cgp.name.is_some() {
+                                        panic!("Duplicate `name`");
+                                    }
+                                    name_eqsign_pending = true;
+                                }
+                                "traitname" => {
+                                    if cgp.traitname.is_some() {
+                                        panic!("Duplicate `traitname`");
+                                    }
+                                    traitname_eqsign_pending = true;
+                                }
                                 t => panic!("This suboption (`{}`) is not supported", t),
                             },
                             proc_macro2::TokenTree::Punct(p) => {
@@ -99,7 +160,9 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
                             }
                         }
                     }
-
+                    if name_eqsign_pending || traitname_eqsign_pending || name_ident_pending || traitname_ident_pending {
+                        panic!("Unfinished [trait]name=");
+                    }
                     if extra_arg_expecting_value {
                         panic!("Unfinished `extra_field_type`")
                     }
@@ -178,6 +241,14 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
                     returnval_ident_pending = false;
                     continue;
                 }
+                if name_eqsign_pending {
+                    panic!("`name` should be followed by `=` character");
+                }
+                if name_ident_pending {
+                    params.enum_name = Some(x.clone());
+                    name_ident_pending = false;
+                    continue;
+                }
                 if custom_attr_pending {
                     panic!("custom_attr should be followed by a group");
                 }
@@ -245,6 +316,12 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
                     "enum_attr" => {
                         custom_attr_pending = true;
                     }
+                    "name" => {
+                        if params.enum_name.is_some() {
+                            panic!("Duplicate `name`");
+                        }
+                        name_eqsign_pending = true;
+                    }
                     t => panic!("This option (`{}`) is not supported", t),
                 }
             }
@@ -252,12 +329,23 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
                 if returnval_ident_pending {
                     panic!("returnval= should be followed by ident");
                 }
+                if name_ident_pending {
+                    panic!("name= should be followed by ident");
+                }
                 if returnval_eqsign_pending {
                     if x.as_char() != '=' {
                         panic!("returnval should be followed by `=` character");
                     }
                     returnval_eqsign_pending = false;
                     returnval_ident_pending = true;
+                    continue;
+                }
+                if name_eqsign_pending {
+                    if x.as_char() != '=' {
+                        panic!("`name` should be followed by `=` character");
+                    }
+                    name_eqsign_pending = false;
+                    name_ident_pending = true;
                     continue;
                 }
                 if custom_attr_pending {
@@ -277,6 +365,9 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
     }
     if returnval_ident_pending || returnval_eqsign_pending {
         panic!("Unfinished `returnval=...` argument");
+    }
+    if name_eqsign_pending || name_ident_pending {
+        panic!("Unfinished `name=...` argument");
     }
     params
 }

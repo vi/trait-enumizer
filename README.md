@@ -24,7 +24,10 @@ Main piece of library is `enumizer` attribute macro. It should be attached to tr
     * `unwrapping_impl` - Make the proxy also implement the original trait, using `unwrap` where needed.
     * `unwrapping_and_panicking_impl` - Force proxy to implement the original trait, using `panic!()` calls where complication would fail because of ownership requirements.
     * `extra_field_type` - Add additional second field to proxy struct. That field will be used as additional argument to `macro_class_name!(create(...))` and `macro_class_name!(recv(...))` callbacks.
+    * `name=<ident>` - override the name of the generated struct
+    * `traitname=<ident>` - override the name of the generated "resultified" trait
 * `enum_attr` - Inject custom attribute (e.g. `enum_attr[derive(serde_derive::Serialize)]`)  into enum declaration. Can be repeated. You need to use square brackets for this.
+* `name=<ident>` - override the name of the generated enum
 
 
 Example of attributes syntax:
@@ -38,7 +41,6 @@ Pseudo-derive-helpers:
 * `#[enumizer_enum_attr[...]]` - Forward specified attribute to generated enum. Example: `#[enumizer_enum_attr[serde(rename="qqq")]]`. Can be attached to functions (which become enum variants) or to function arguments (which become enum variant fields).
 * `#[enumizer_return_attr[...]]` - in `returnval` mode, attach custom attribute to the `ret` field of the enum.
 * `#[enumizer_to_owned]` - For reference argument type, use owned value instead of trying to put reference to enum (which may not work, unless `'static`).
-
 
 To understand how the crate functions, you can view some test files:
 

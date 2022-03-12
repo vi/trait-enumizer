@@ -16,7 +16,6 @@ enum ReceiverStyle {
     Ref,
 }
 
-
 struct Method {
     name: Ident,
     receiver_style: ReceiverStyle,
@@ -55,14 +54,26 @@ struct InputData {
 }
 impl InputData {
     fn enum_name(&self) -> Ident {
-        quote::format_ident!("{}Enum", self.name)
+        if let Some(n) = &self.params.enum_name {
+            n.clone()
+        } else {
+            quote::format_ident!("{}Enum", self.name)
+        }
     }
-    fn resultified_trait_name(&self, gpparams : &GenProxyParams) -> Ident {
-        quote::format_ident!("{}Resultified{}", self.name, gpparams.level.identpart())
+    fn resultified_trait_name(&self, gpparams: &GenProxyParams) -> Ident {
+        if let Some(n) = &gpparams.traitname {
+            n.clone()
+        } else {
+            quote::format_ident!("{}Resultified{}", self.name, gpparams.level.identpart())
+        }
     }
 
-    fn proxy_name(&self, gpparams : &GenProxyParams) -> Ident {
-        quote::format_ident!("{}Proxy{}", self.name, gpparams.level.identpart())
+    fn proxy_name(&self, gpparams: &GenProxyParams) -> Ident {
+        if let Some(n) = &gpparams.name {
+            n.clone()
+        } else {
+            quote::format_ident!("{}Proxy{}", self.name, gpparams.level.identpart())
+        }
     }
 }
 
@@ -73,20 +84,28 @@ mod util;
 
 impl InputData {}
 
-
 struct GenProxyParams {
     level: ReceiverStyle,
     gen_infallible: bool,
     gen_unwrapping: bool,
     gen_unwrapping_and_panicking: bool,
     extra_arg: Option<proc_macro2::TokenStream>,
+    name: Option<Ident>,
+    traitname: Option<Ident>,
 }
 impl GenProxyParams {
     fn new(level: ReceiverStyle) -> GenProxyParams {
-        GenProxyParams { level, gen_infallible: false, gen_unwrapping: false, gen_unwrapping_and_panicking: false, extra_arg: None }
+        GenProxyParams {
+            level,
+            gen_infallible: false,
+            gen_unwrapping: false,
+            gen_unwrapping_and_panicking: false,
+            extra_arg: None,
+            name: None,
+            traitname: None,
+        }
     }
 }
-
 
 struct CallFnParams {
     level: ReceiverStyle,
@@ -94,7 +113,13 @@ struct CallFnParams {
     extra_arg: Option<proc_macro2::TokenStream>,
 }
 impl CallFnParams {
-    fn new(level: ReceiverStyle) -> CallFnParams { CallFnParams { level, allow_panic: false, extra_arg: None }}
+    fn new(level: ReceiverStyle) -> CallFnParams {
+        CallFnParams {
+            level,
+            allow_panic: false,
+            extra_arg: None,
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -120,6 +145,7 @@ struct Params {
     access_mode: AccessMode,
     returnval: Option<proc_macro2::Ident>,
     enum_attr: Vec<proc_macro2::Group>,
+    enum_name: Option<Ident>,
 }
 
 #[proc_macro_attribute]

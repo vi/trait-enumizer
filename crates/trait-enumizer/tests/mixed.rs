@@ -1,5 +1,11 @@
 mod inner {
-    #[trait_enumizer::enumizer(pub_crate, call_mut(allow_panic),ref_proxy(unwrapping_impl),enum_attr[derive(serde_derive::Serialize)])]
+    #[trait_enumizer::enumizer(
+        name=TheEnum,
+        pub_crate,
+        call_mut(allow_panic),
+        ref_proxy(unwrapping_impl,name=TheCaller,traitname=ITheCaller),
+        enum_attr[derive(serde_derive::Serialize)]
+    )]
     pub trait MyIface {
         fn increment(&mut self);
         fn increment2(&mut self, #[enumizer_enum_attr[serde(rename="www")]] x : i32);
@@ -34,11 +40,11 @@ mod inner {
     }
 }
 
-use inner::{MyIface, MyIfaceEnum, MyIfaceProxy};
+use inner::{MyIface, TheEnum, TheCaller};
 
 #[test]
 fn test() {
-    let (tx,rx) = flume::bounded::<MyIfaceEnum>(1);
+    let (tx,rx) = flume::bounded::<TheEnum>(1);
     std::thread::spawn(move || {
         let mut o = inner::Implementor(100);
         for msg in rx {
@@ -46,7 +52,7 @@ fn test() {
             msg.call_mut(&mut o);
         }
     });
-    let mut p = MyIfaceProxy::<_, _>(|c| tx.send(c));
+    let mut p = TheCaller::<_, _>(|c| tx.send(c));
     dbg!(p.reset());
     dbg!(p.increment2(4));
     dbg!(p.print());
