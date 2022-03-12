@@ -26,13 +26,19 @@ Main piece of library is `enumizer` attribute macro. It should be attached to tr
     * `extra_field_type` - Add additional second field to proxy struct. That field will be used as additional argument to `macro_class_name!(create(...))` and `macro_class_name!(recv(...))` callbacks.
 * `enum_attr` - Inject custom attribute (e.g. `enum_attr[derive(serde_derive::Serialize)]`)  into enum declaration. Can be repeated. You need to use square brackets for this.
 
-Trait's functions and their arguments may be annotated with `#[enumizer_enum_attr[...]]` to become enum variants' and their fields' attributes. Use `#[enumizer_return_attr[...]]` to attached attributes to return value's fields. 
 
 Example of attributes syntax:
 
 ```rust,ignore
 #[trait_enumizer::enumizer(pub_crate, call_mut(allow_panic),ref_proxy(unwrapping_impl))]
 ```
+
+Pseudo-derive-helpers:
+
+* `#[enumizer_enum_attr[...]]` - Forward specified attribute to generated enum. Example: `#[enumizer_enum_attr[serde(rename="qqq")]]`. Can be attached to functions (which become enum variants) or to function arguments (which become enum variant fields).
+* `#[enumizer_return_attr[...]]` - in `returnval` mode, attach custom attribute to the `ret` field of the enum.
+* `#[enumizer_to_owned]` - For reference argument type, use owned value instead of trying to put reference to enum (which may not work, unless `'static`).
+
 
 To understand how the crate functions, you can view some test files:
 
@@ -43,3 +49,4 @@ To understand how the crate functions, you can view some test files:
 * [`returnval_derive.rs`](crates/trait-enumizer/tests/returnval_derive.rs), [`returnval_manual_generic.rs`](crates/trait-enumizer/tests/returnval_manual_generic.rs) - Tricker mode for handling return values.
 * [`returnval_manual_flume.rs`](crates/trait-enumizer/tests/returnval_manual_flume.rs) - Original version without the channel abstraction, hard coded for [flume](https://crates.io/crates/flume) instead.
 * [`rpc.rs`](crates/trait-enumizer/tests/rpc.rs) - Demonstrates advanced usage of custom `returnval=` classes to make remote prodecure call using serde_json and flume. Two primary Flume channels simulate a socket, interim Flume channels route return values back to callers.
+* [`toowned_manual`], [`toowned_derive`] - Expanded (manual) and automaitcally derived demonstration of `#[enumizer_to_owned]` feature.

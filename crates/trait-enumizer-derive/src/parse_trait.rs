@@ -79,6 +79,7 @@ impl TheTrait {
                             }
                             syn::FnArg::Typed(arg) => {
                                 let mut enum_attr = vec![];
+                                let mut to_owned = false;
                                 arg.attrs.retain(|a| match a.path.get_ident() {
                                     Some(x) if x == "enumizer_enum_attr" => {
                                         match a.tokens.clone().into_iter().next() {
@@ -87,6 +88,13 @@ impl TheTrait {
                                             }
                                             _ => panic!("Input of `enumizer_enum_attr` should be a single [...] group"),
                                         }
+                                        false
+                                    }
+                                    Some(x) if x == "enumizer_to_owned" => {
+                                        if ! a.tokens.is_empty() {
+                                            panic!("`enumizer_to_owned` does not accept any additional arguments");
+                                        }
+                                        to_owned = true;
                                         false
                                     }
                                     _ => true,
@@ -101,7 +109,7 @@ impl TheTrait {
                                                 panic!("In `returnval` mode, method's arguments cannot be named literally `ret`. Rename it away in `{}`.", sig.ident);
                                             }
                                         }
-                                        args.push(Argument { name: pi.ident.clone(), ty: *arg.ty.clone(), enum_attr });
+                                        args.push(Argument { name: pi.ident.clone(), ty: *arg.ty.clone(), enum_attr, to_owned });
                                     }
                                     _ => panic!("Trait-enumizer does not support method arguments that are patterns, not just simple identifiers"),
                                 }

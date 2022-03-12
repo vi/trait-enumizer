@@ -21,7 +21,18 @@ impl TheTrait {
             let mut variant_params = TokenStream::new();
             for arg in &method.args {
                 let n = &arg.name;
-                let t = &arg.ty;
+                let t = if !arg.to_owned {
+                    let ty = &arg.ty;
+                    q!{#ty}
+                } else {
+                    match &arg.ty {
+                        syn::Type::Reference(r) => {
+                            let ty = &*r.elem;
+                            q!{<#ty as ::std::borrow::ToOwned>::Owned}
+                        }
+                        _ => panic!("Argument marked with `#[enumizer_to_owned]` must be a &reference"),
+                    }
+                };
                 let mut a = TokenStream::new();
                 for aa in &arg.enum_attr {
                     a.extend(q!{# #aa});
@@ -94,9 +105,15 @@ impl TheTrait {
                 variant_params_with_ret.extend(q! {
                     #n,
                 });
-                variant_params.extend(q! {
-                    #n,
-                });
+                if !arg.to_owned {
+                    variant_params.extend(q! {
+                        #n,
+                    });
+                } else {
+                    variant_params.extend(q! {
+                        ::std::borrow::Borrow::borrow(& #n),
+                    });
+                }
             }
             if let Some(_rt) = &method.ret {
                 variant_params_with_ret.extend(q! {
@@ -240,9 +257,15 @@ impl TheTrait {
                 args_with_types.extend(q! {
                     #n : #t,
                 });
-                args_without_types.extend(q! {
-                    #n,
-                });
+                if ! arg.to_owned {
+                    args_without_types.extend(q! {
+                        #n,
+                    });
+                } else {
+                    args_without_types.extend(q! {
+                        #n: ::std::borrow::ToOwned::to_owned(#n),
+                    });
+                }
             }
             let slf = level.ts();
             if let Some(rt) = &method.ret {

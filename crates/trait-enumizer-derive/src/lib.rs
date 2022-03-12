@@ -6,6 +6,7 @@ struct Argument {
     name: Ident,
     ty: syn::Type,
     enum_attr: Vec<proc_macro2::Group>,
+    to_owned: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
