@@ -2,6 +2,7 @@ use proc_macro2::TokenStream;
 
 use crate::AccessMode;
 use crate::CallFnParams;
+use crate::ReceiverStyle;
 
 use super::GenProxyParams;
 
@@ -185,42 +186,42 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
                         if params.ref_proxy.is_some() {
                             panic!("Duplicate `ref_proxy`");
                         }
-                        params.ref_proxy = Some(GenProxyParams::default());
+                        params.ref_proxy = Some(GenProxyParams::new(ReceiverStyle::Ref));
                         current_genproxy = params.ref_proxy.as_mut();
                     }
                     "mut_proxy" => {
                         if params.mut_proxy.is_some() {
                             panic!("Duplicate `ref_proxy`");
                         }
-                        params.mut_proxy = Some(GenProxyParams::default());
+                        params.mut_proxy = Some(GenProxyParams::new(ReceiverStyle::Mut));
                         current_genproxy = params.mut_proxy.as_mut();
                     }
                     "once_proxy" => {
                         if params.once_proxy.is_some() {
                             panic!("Duplicate `ref_proxy`");
                         }
-                        params.once_proxy = Some(GenProxyParams::default());
+                        params.once_proxy = Some(GenProxyParams::new(ReceiverStyle::Move));
                         current_genproxy = params.once_proxy.as_mut();
                     }
                     "call" => {
                         if params.call_ref.is_some() {
                             panic!("Duplicate `call`");
                         }
-                        params.call_ref = Some(CallFnParams::default());
+                        params.call_ref = Some(CallFnParams::new(ReceiverStyle::Ref));
                         current_callfn = params.call_ref.as_mut();
                     }
                     "call_mut" => {
                         if params.call_mut.is_some() {
                             panic!("Duplicate `call`");
                         }
-                        params.call_mut = Some(CallFnParams::default());
+                        params.call_mut = Some(CallFnParams::new(ReceiverStyle::Mut));
                         current_callfn = params.call_mut.as_mut();
                     }
                     "call_once" => {
                         if params.call_once.is_some() {
                             panic!("Duplicate `call`");
                         }
-                        params.call_once = Some(CallFnParams::default());
+                        params.call_once = Some(CallFnParams::new(ReceiverStyle::Move));
                         current_callfn = params.call_once.as_mut();
                     }
                     "pub" => {

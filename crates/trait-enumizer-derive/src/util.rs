@@ -2,11 +2,11 @@ use proc_macro2::{TokenStream};
 
 use crate::{Argument, AccessMode};
 
-use super::{TheTrait, ReceiverStyle};
+use super::{InputData, ReceiverStyle};
 
 use quote::quote as q;
 
-impl std::fmt::Debug for TheTrait {
+impl std::fmt::Debug for InputData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TheTrait")
             .field("name", &self.name.to_string())
@@ -16,7 +16,7 @@ impl std::fmt::Debug for TheTrait {
 }
 
 
-impl TheTrait {
+impl InputData {
     pub(crate) fn receiver_style_that_is_the_most_inconvenient_for_caller(&self) -> ReceiverStyle {
         use ReceiverStyle::{Move, Mut, Ref};
         let mut style = Ref;

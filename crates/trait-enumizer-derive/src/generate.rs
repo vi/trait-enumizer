@@ -2,18 +2,17 @@ use convert_case::Casing;
 use proc_macro2::TokenStream;
 use quote::quote as q;
 
-use crate::AccessMode;
+use crate::{CallFnParams, GenProxyParams};
 
-use super::{ReceiverStyle, TheTrait};
-impl TheTrait {
+use super::{ReceiverStyle, InputData};
+impl InputData {
     pub(crate) fn generate_enum(
         &self,
         out: &mut TokenStream,
-        am: AccessMode,
-        returnval_mode: Option<&proc_macro2::Ident>,
-        custom_attrs: &[proc_macro2::Group],
     ) {
-        let am = am.code();
+        let returnval_handler = self.params.returnval.as_ref();
+        let custom_attrs = &self.params.enum_attr[..];
+        let am = self.params.access_mode.code();
         let enum_name = quote::format_ident!("{}Enum", self.name);
         let mut variants = TokenStream::new();
         for method in &self.methods {
@@ -46,7 +45,7 @@ impl TheTrait {
                 for aa in &method.return_attr {
                     ra.extend(q!{# #aa});
                 }
-                let chmacro = returnval_mode.unwrap(); 
+                let chmacro = returnval_handler.unwrap(); 
                 variant_params.extend(q!{
                     #ra ret : #chmacro ! (Sender<#rv>),
                 });
@@ -79,12 +78,12 @@ impl TheTrait {
     pub(crate) fn generate_call_fn(
         &self,
         out: &mut TokenStream,
-        level: ReceiverStyle,
-        am: AccessMode,
-        returnval_mode: Option<&proc_macro2::Ident>,
-        extra_arg: Option<&proc_macro2::TokenStream>,
+        cfparams : &CallFnParams,
     ) {
-        let am = am.code();
+        let am = self.params.access_mode.code();
+        let returnval_handler = self.params.returnval.as_ref();
+        let extra_arg = cfparams.extra_arg.as_ref();
+        let level = cfparams.level;
         let enum_name = quote::format_ident!("{}Enum", self.name);
         let name = &self.name;
         let mut variants = TokenStream::new();
@@ -129,7 +128,7 @@ impl TheTrait {
             };
             let action = if can_do_it {
                 if let Some(rt) = &method.ret {
-                    if let Some(m) = returnval_mode {
+                    if let Some(m) = returnval_handler {
                         let ea = if extra_arg.is_some() {
                             q!{, extra_arg}
                         } else {
@@ -140,7 +139,7 @@ impl TheTrait {
                         unreachable!("parsing function should have already rejected this case");
                     }
                 } else {
-                    if returnval_mode.is_none() {
+                    if returnval_handler.is_none() {
                         q! {o.#method_name(#variant_params)}
                     } else {
                         q! {Ok(o.#method_name(#variant_params))}
@@ -150,7 +149,7 @@ impl TheTrait {
                 let literal1 = proc_macro2::Literal::string(&format!(
                     "{}Enum::{}",
                     self.name,
-                    level.call_fn_name(returnval_mode.is_some())
+                    level.call_fn_name(returnval_handler.is_some())
                 ));
                 let literal2 = proc_macro2::Literal::string(&method_name.to_string());
                 q! {panic!("Cannot call `{}` from `{}` due to incompative `self` access mode", #literal2, #literal1)}
@@ -160,14 +159,14 @@ impl TheTrait {
             });
         }
 
-        let fnname = level.call_fn_ts(returnval_mode.is_some());
+        let fnname = level.call_fn_ts(returnval_handler.is_some());
         let o = match level {
             ReceiverStyle::Move => q! {mut o: I},
             ReceiverStyle::Mut => q! {o: &mut I},
             ReceiverStyle::Ref => q! {o: &I},
         };
 
-        let rett = if let Some(m) = returnval_mode {
+        let rett = if let Some(m) = returnval_handler {
             q!{ -> Result<(), #m ! (SendError)>}
         } else {
             q!{}
@@ -190,11 +189,11 @@ impl TheTrait {
     pub(crate) fn generate_resultified_trait(
         &self,
         out: &mut TokenStream,
-        level: ReceiverStyle,
-        am: AccessMode,
-        returnval_mode: Option<&proc_macro2::Ident>,
+        gpparams: &GenProxyParams,
     ) {
-        let am = am.code();
+        let am = self.params.access_mode.code();
+        let level = gpparams.level;
+        let returnval_handler = self.params.returnval.as_ref();
         let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
         //let name = &self.name;
         let mut methods = TokenStream::new();
@@ -211,7 +210,7 @@ impl TheTrait {
             }
             let slf = level.ts();
             let ret = if let Some(rt) = &method.ret {
-                if let Some(m) = returnval_mode {
+                if let Some(m) = returnval_handler {
                     q!{::std::result::Result<#rt, #m ! ( RecvError )>}
                 } else {
                     unreachable!("Should had been rejected earlier")
@@ -234,12 +233,12 @@ impl TheTrait {
     pub(crate) fn generate_proxy(
         &self,
         out: &mut TokenStream,
-        level: ReceiverStyle,
-        am: AccessMode,
-        returnval_mode: Option<&proc_macro2::Ident>,
-        extra_arg: Option<&proc_macro2::TokenStream>,
+        gpparams: &GenProxyParams,
     ) {
-        let am = am.code();
+        let am = self.params.access_mode.code();
+        let returnval_handler = self.params.returnval.as_ref();
+        let extra_arg = gpparams.extra_arg.as_ref();
+        let level = gpparams.level;
         let enum_name = quote::format_ident!("{}Enum", self.name);
         let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
         let proxy_name = quote::format_ident!("{}Proxy{}", self.name, level.identpart());
@@ -269,7 +268,7 @@ impl TheTrait {
             }
             let slf = level.ts();
             if let Some(rt) = &method.ret {
-                let chmacro = returnval_mode.unwrap();
+                let chmacro = returnval_handler.unwrap();
                 let (ea_with_comma, ea) = if let Some(_eat) = extra_arg {
                     (q!{, self.1}, q!{self.1})
                 } else {
@@ -306,7 +305,8 @@ impl TheTrait {
             }
         });
     }
-    pub(crate) fn generate_infallible_impl(&self, out: &mut TokenStream, level: ReceiverStyle) {
+    pub(crate) fn generate_infallible_impl(&self, out: &mut TokenStream, gpparams: &GenProxyParams) {
+        let level = gpparams.level;
         let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
         let name = &self.name;
         let mut methods = TokenStream::new();
@@ -342,9 +342,10 @@ impl TheTrait {
     pub(crate) fn generate_unwrapping_impl(
         &self,
         out: &mut TokenStream,
-        level: ReceiverStyle,
-        returnval_mode: Option<&proc_macro2::Ident>,
+        gpparams: &GenProxyParams,
     ) {
+        let returnval_handler = self.params.returnval.as_ref();
+        let level = gpparams.level;
         let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
         let proxy_name = quote::format_ident!("{}Proxy{}", self.name, level.identpart());
         let fn_trait = level.fn_trait();
@@ -405,7 +406,7 @@ impl TheTrait {
                 });
             }
         }
-        let wh1 = if let Some(m) = returnval_mode {
+        let wh1 = if let Some(m) = returnval_handler {
             q!{,#m ! (RecvError) : ::std::fmt::Debug}
         } else {
             q!{}

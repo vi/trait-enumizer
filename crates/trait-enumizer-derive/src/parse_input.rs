@@ -1,10 +1,11 @@
 use proc_macro2::TokenTree;
 
-use crate::{Method, Argument};
+use crate::{Method, Argument, Params};
 
-use super::{TheTrait, ReceiverStyle};
-impl TheTrait {
-    pub(crate) fn parse(item: &mut syn::ItemTrait, returnval: bool) -> TheTrait {
+use super::{InputData, ReceiverStyle};
+impl InputData {
+    pub(crate) fn parse(item: &mut syn::ItemTrait, params: Params) -> InputData {
+        let returnval = params.returnval.is_some();
         let mut methods = Vec::with_capacity(item.items.len());
 
         for x in &mut item.items {
@@ -144,9 +145,10 @@ impl TheTrait {
             }
         }
 
-        TheTrait {
+        InputData {
             name: item.ident.clone(),
             methods,
+            params,
         }
     }
 }
