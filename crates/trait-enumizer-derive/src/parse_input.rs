@@ -8,34 +8,34 @@ impl InputData {
         let returnval = params.returnval.is_some();
         let mut methods = Vec::with_capacity(item.items.len());
 
-        for x in &mut item.items {
-            match x {
-                syn::TraitItem::Method(m) => {
+        for item in &mut item.items {
+            match item {
+                syn::TraitItem::Method(method) => {
                     let mut enum_attr = vec![];
                     let mut return_attr = vec![];
-                    let sig = &mut m.sig;
-                    if sig.constness.is_some() {
+                    let method_signature = &mut method.sig;
+                    if method_signature.constness.is_some() {
                         panic!("Trait-enumizer does not support const");
                     }
-                    if sig.asyncness.is_some() {
+                    if method_signature.asyncness.is_some() {
                         panic!("Trait-enumizer does not support async");
                     }
-                    if sig.unsafety.is_some() {
+                    if method_signature.unsafety.is_some() {
                         panic!("Trait-enumizer does not support unsafe");
                     }
-                    if sig.abi.is_some() {
+                    if method_signature.abi.is_some() {
                         panic!("Trait-enumizer does not support custom ABI in trait methods")
                     }
-                    if !sig.generics.params.is_empty() {
+                    if !method_signature.generics.params.is_empty() {
                         panic!("Trait-enumizer does not support generics or lifetimes in trait methods")
                     }
-                    if sig.variadic.is_some() {
+                    if method_signature.variadic.is_some() {
                         panic!("Trait-enumizer does not support variadics")
                     }
-                    if !returnval && !matches!(sig.output, syn::ReturnType::Default) {
+                    if !returnval && !matches!(method_signature.output, syn::ReturnType::Default) {
                         panic!("Specify `returnval` parameter to handle methods with return types.")
                     }
-                    m.attrs.retain(|a| match a.path.get_ident() {
+                    method.attrs.retain(|a| match a.path.get_ident() {
                         Some(x) if x == "enumizer_enum_attr" || x == "enumizer_return_attr" => {
                             let g = match a.tokens.clone().into_iter().next() {
                                 Some(TokenTree::Group(g)) => {
@@ -53,17 +53,17 @@ impl InputData {
                         _ => true,
                     });
 
-                    let mut args = Vec::with_capacity(sig.inputs.len());
+                    let mut args = Vec::with_capacity(method_signature.inputs.len());
 
                     let mut receiver_style = None;
 
-                    let ret = match &sig.output {
+                    let ret = match &method_signature.output {
                         syn::ReturnType::Default => None,
                         syn::ReturnType::Type(_, t) => Some(*t.clone()),
                     };
 
-                    for inp in &mut sig.inputs {
-                        match inp {
+                    for input_args in &mut method_signature.inputs {
+                        match input_args {
                             syn::FnArg::Receiver(r) => {
                                 receiver_style = if let Some(rr) = &r.reference {
                                     if rr.1.is_some() {
@@ -107,7 +107,7 @@ impl InputData {
                                         }
                                         if returnval {
                                             if pi.ident.to_string() == "ret" {
-                                                panic!("In `returnval` mode, method's arguments cannot be named literally `ret`. Rename it away in `{}`.", sig.ident);
+                                                panic!("In `returnval` mode, method's arguments cannot be named literally `ret`. Rename it away in `{}`.", method_signature.ident);
                                             }
                                         }
                                         args.push(Argument { name: pi.ident.clone(), ty: *arg.ty.clone(), enum_attr, to_owned });
@@ -124,7 +124,7 @@ impl InputData {
 
                     let method = Method {
                         args,
-                        name: sig.ident.clone(),
+                        name: method_signature.ident.clone(),
                         receiver_style: receiver_style.unwrap(),
                         ret,
                         enum_attr,

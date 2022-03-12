@@ -280,3 +280,56 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
     }
     params
 }
+
+#[test]
+fn test_parser1() {
+    let attrs = parse_args(quote::quote! { });
+    assert_eq!(attrs.access_mode, AccessMode::Priv);
+    assert!(attrs.call_ref.is_none());
+    assert!(attrs.call_mut.is_none());
+    assert!(attrs.call_once.is_none());
+    assert!(attrs.ref_proxy.is_none());
+    assert!(attrs.mut_proxy.is_none());
+    assert!(attrs.once_proxy.is_none());
+    assert!(attrs.enum_attr.is_empty());
+    assert!(attrs.returnval.is_none());
+}
+
+
+#[test]
+fn test_parser2() {
+    let attrs = parse_args(quote::quote! { 
+        returnval=my_rpc_class,
+        call(extra_arg_type(i32)),
+        call_mut(extra_arg_type(&flume::Sender<String>)),
+        call_once(allow_panic),
+        ref_proxy(unwrapping_impl,extra_field_type(MyRpcClient)),
+        mut_proxy(infallible_impl),
+        once_proxy(unwrapping_and_panicking_impl),
+        enum_attr[derive(serde_derive::Serialize,serde_derive::Deserialize)],
+        enum_attr[222]
+    });
+    assert_eq!(attrs.access_mode, AccessMode::Priv);
+    assert_eq!(attrs.call_ref.as_ref().unwrap().allow_panic, false);
+    assert_eq!(attrs.call_mut.as_ref().unwrap().allow_panic, false);
+    assert_eq!(attrs.call_once.as_ref().unwrap().allow_panic, true);
+    
+    assert!(attrs.call_ref.as_ref().unwrap().extra_arg.is_some());
+    assert!(attrs.call_mut.as_ref().unwrap().extra_arg.is_some());
+    assert!(attrs.call_once.as_ref().unwrap().extra_arg.is_none());
+
+    assert_eq!(attrs.ref_proxy.as_ref().unwrap().gen_unwrapping, true);
+    assert_eq!(attrs.ref_proxy.as_ref().unwrap().gen_infallible, false);
+    assert_eq!(attrs.ref_proxy.as_ref().unwrap().gen_unwrapping_and_panicking, false);
+
+    assert_eq!(attrs.mut_proxy.as_ref().unwrap().gen_unwrapping, false);
+    assert_eq!(attrs.mut_proxy.as_ref().unwrap().gen_infallible, true);
+    assert_eq!(attrs.mut_proxy.as_ref().unwrap().gen_unwrapping_and_panicking, false);
+
+    assert_eq!(attrs.once_proxy.as_ref().unwrap().gen_unwrapping, false);
+    assert_eq!(attrs.once_proxy.as_ref().unwrap().gen_infallible, false);
+    assert_eq!(attrs.once_proxy.as_ref().unwrap().gen_unwrapping_and_panicking, true);
+
+    assert_eq!(attrs.enum_attr.len(), 2);
+    assert_eq!(attrs.returnval.unwrap().to_string(), "my_rpc_class");
+}

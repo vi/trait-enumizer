@@ -85,7 +85,7 @@ impl CallFnParams {
     fn new(level: ReceiverStyle) -> CallFnParams { CallFnParams { level, allow_panic: false, extra_arg: None }}
 }
 
-#[derive(PartialEq, Eq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
 enum AccessMode {
     Priv,
     Pub,
