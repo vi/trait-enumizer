@@ -50,3 +50,8 @@ To understand how the crate functions, you can view some test files:
 * [`returnval_manual_flume.rs`](crates/trait-enumizer/tests/returnval_manual_flume.rs) - Original version without the channel abstraction, hard coded for [flume](https://crates.io/crates/flume) instead.
 * [`rpc.rs`](crates/trait-enumizer/tests/rpc.rs) - Demonstrates advanced usage of custom `returnval=` classes to make remote prodecure call using serde_json and flume. Two primary Flume channels simulate a socket, interim Flume channels route return values back to callers.
 * [`toowned_manual`], [`toowned_derive`] - Expanded (manual) and automaitcally derived demonstration of `#[enumizer_to_owned]` feature.
+
+
+# See also
+
+* [spaad](https://crates.io/crates/spaad)
