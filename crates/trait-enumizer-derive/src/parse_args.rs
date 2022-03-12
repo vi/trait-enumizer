@@ -322,6 +322,12 @@ pub(crate) fn parse_args(attrs: TokenStream) -> Params {
                         }
                         name_eqsign_pending = true;
                     }
+                    "inherent_impl" => {
+                        if params.inherent_impl_mode {
+                            panic!("Duplicate `inherent_impl`");
+                        }
+                        params.inherent_impl_mode = true;
+                    }
                     t => panic!("This option (`{}`) is not supported", t),
                 }
             }

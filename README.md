@@ -28,6 +28,7 @@ Main piece of library is `enumizer` attribute macro. It should be attached to tr
     * `traitname=<ident>` - override the name of the generated "resultified" trait
 * `enum_attr` - Inject custom attribute (e.g. `enum_attr[derive(serde_derive::Serialize)]`)  into enum declaration. Can be repeated. You need to use square brackets for this.
 * `name=<ident>` - override the name of the generated enum
+* `inherent_impl` - Base enum on an inherent impl instead of a trait.
 
 
 Example of attributes syntax:
@@ -51,7 +52,8 @@ To understand how the crate functions, you can view some test files:
 * [`returnval_derive.rs`](crates/trait-enumizer/tests/returnval_derive.rs), [`returnval_manual_generic.rs`](crates/trait-enumizer/tests/returnval_manual_generic.rs) - Tricker mode for handling return values.
 * [`returnval_manual_flume.rs`](crates/trait-enumizer/tests/returnval_manual_flume.rs) - Original version without the channel abstraction, hard coded for [flume](https://crates.io/crates/flume) instead.
 * [`rpc.rs`](crates/trait-enumizer/tests/rpc.rs) - Demonstrates advanced usage of custom `returnval=` classes to make remote prodecure call using serde_json and flume. Two primary Flume channels simulate a socket, interim Flume channels route return values back to callers.
-* [`toowned_manual`], [`toowned_derive`] - Expanded (manual) and automaitcally derived demonstration of `#[enumizer_to_owned]` feature.
+* [`toowned_manual`](crates/trait-enumizer/tests/toowned_manual.rs), [`toowned_derive`](crates/trait-enumizer/tests/toowned_derive.rs) - Expanded (manual) and automaitcally derived demonstration of `#[enumizer_to_owned]` feature.
+* [`inherent_derive`](crates/trait-enumizer/tests/inherent_derive.rs) - demonstrates `inherent_impl` mode.
 
 
 # See also

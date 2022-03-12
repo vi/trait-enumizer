@@ -105,6 +105,10 @@ impl GenProxyParams {
             traitname: None,
         }
     }
+
+    fn some_impl_requested(&self) -> bool {
+        self.gen_infallible || self.gen_unwrapping || self.gen_unwrapping_and_panicking
+    }
 }
 
 struct CallFnParams {
@@ -146,6 +150,7 @@ struct Params {
     returnval: Option<proc_macro2::Ident>,
     enum_attr: Vec<proc_macro2::Group>,
     enum_name: Option<Ident>,
+    inherent_impl_mode : bool,
 }
 
 #[proc_macro_attribute]
@@ -159,12 +164,19 @@ pub fn enumizer(
     let params = parse_args::parse_args(attrs);
 
     let mut ret = TokenStream::new();
-    let mut tra: syn::ItemTrait = syn::parse2(input).unwrap();
-    let input_data = InputData::parse(&mut tra, params);
-
+    let input_data = if ! params.inherent_impl_mode {
+        let mut tra: syn::ItemTrait = syn::parse2(input).unwrap();
+        let input_data = InputData::parse_trait(&mut tra, params);
+        ret.extend(quote::quote! {#tra});
+        input_data
+    } else {
+        let mut imp: syn::ItemImpl = syn::parse2(input).unwrap();
+        let input_data = InputData::parse_inherent_impl(&mut imp, params);
+        ret.extend(quote::quote! {#imp});
+        input_data
+    };
     let params = &input_data.params;
-
-    ret.extend(quote::quote! {#tra});
+   
     //dbg!(thetrait);
     input_data.generate_enum(&mut ret);
 
@@ -191,6 +203,9 @@ pub fn enumizer(
     if let Some(g) = &params.ref_proxy {
         input_data.generate_resultified_trait(&mut ret, g);
         input_data.generate_proxy(&mut ret, g);
+        if params.inherent_impl_mode && g.some_impl_requested() {
+            panic!("Generating trait impls is incompatible with inherent_impl mode");
+        }
         if g.gen_infallible {
             if params.returnval.is_some() {
                 panic!("infallible_impl and returnval are incompatible");
@@ -204,6 +219,9 @@ pub fn enumizer(
     if let Some(g) = &params.mut_proxy {
         input_data.generate_resultified_trait(&mut ret, g);
         input_data.generate_proxy(&mut ret, g);
+        if params.inherent_impl_mode && g.some_impl_requested() {
+            panic!("Generating trait impls is incompatible with inherent_impl mode");
+        }
         if g.gen_infallible || g.gen_unwrapping {
             if callee_inconv == ReceiverStyle::Ref {
                 panic!("The trait contains &self methods. The mutable proxy cannot implement it. Use `unwrapping_and_panicking_impl` to force generation and retain only some methods");
@@ -222,6 +240,9 @@ pub fn enumizer(
     if let Some(g) = &params.once_proxy {
         input_data.generate_resultified_trait(&mut ret, g);
         input_data.generate_proxy(&mut ret, g);
+        if params.inherent_impl_mode && g.some_impl_requested() {
+            panic!("Generating trait impls is incompatible with inherent_impl mode");
+        }
         if g.gen_infallible || g.gen_unwrapping {
             if callee_inconv != ReceiverStyle::Move {
                 panic!("The trait contains `&self` or `&mut self` methods. The once proxy cannot implement it - only for traits with solely `self` methods. Use `unwrapping_and_panicking_impl` to force generation and retain only some methods");
