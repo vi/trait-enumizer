@@ -13,7 +13,7 @@ impl InputData {
         let returnval_handler = self.params.returnval.as_ref();
         let custom_attrs = &self.params.enum_attr[..];
         let pub_or_priv = self.params.access_mode.code();
-        let enum_name = quote::format_ident!("{}Enum", self.name);
+        let enum_name = self.enum_name();
         let mut variants = TokenStream::new();
         for method in &self.methods {
             let variant_name = method.variant_name();
@@ -84,7 +84,7 @@ impl InputData {
         let returnval_handler = self.params.returnval.as_ref();
         let extra_arg = cfparams.extra_arg.as_ref();
         let level = cfparams.level;
-        let enum_name = quote::format_ident!("{}Enum", self.name);
+        let enum_name = self.enum_name();
         let name = &self.name;
         let mut variants = TokenStream::new();
         for method in &self.methods {
@@ -194,7 +194,7 @@ impl InputData {
         let pub_or_priv = self.params.access_mode.code();
         let level = gpparams.level;
         let returnval_handler = self.params.returnval.as_ref();
-        let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
+        let resultified_trait_name = self.resultified_trait_name(gpparams);
         //let name = &self.name;
         let mut methods = TokenStream::new();
         for method in &self.methods {
@@ -224,7 +224,7 @@ impl InputData {
         }
 
         out.extend(q! {
-            #pub_or_priv trait #rt_name<E> {
+            #pub_or_priv trait #resultified_trait_name<E> {
                 #methods
             }
         });
@@ -239,9 +239,9 @@ impl InputData {
         let returnval_handler = self.params.returnval.as_ref();
         let extra_arg = gpparams.extra_arg.as_ref();
         let level = gpparams.level;
-        let enum_name = quote::format_ident!("{}Enum", self.name);
-        let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
-        let proxy_name = quote::format_ident!("{}Proxy{}", self.name, level.identpart());
+        let enum_name = self.enum_name();
+        let resultified_trait_name = self.resultified_trait_name(gpparams);
+        let proxy_name = self.proxy_name(gpparams);
         //let name = &self.name;
         let mut methods = TokenStream::new();
         for method in &self.methods {
@@ -300,14 +300,13 @@ impl InputData {
         out.extend(q! {
             #pub_or_priv struct #proxy_name<E, F: #fn_trait(#enum_name)-> ::std::result::Result<(), E> > (pub F #maybe_extraarg);
 
-            impl<E, F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>> #rt_name<E> for #proxy_name<E, F> {
+            impl<E, F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>> #resultified_trait_name<E> for #proxy_name<E, F> {
                 #methods
             }
         });
     }
     pub(crate) fn generate_infallible_impl(&self, out: &mut TokenStream, gpparams: &GenProxyParams) {
-        let level = gpparams.level;
-        let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
+        let resultified_trait_name = self.resultified_trait_name(gpparams);
         let name = &self.name;
         let mut methods = TokenStream::new();
         for method in &self.methods {
@@ -333,7 +332,7 @@ impl InputData {
             });
         }
         out.extend(q! {
-            impl<R:#rt_name<::std::convert::Infallible>> #name for R {
+            impl<R:#resultified_trait_name<::std::convert::Infallible>> #name for R {
                 #methods
             }
         });
@@ -346,10 +345,10 @@ impl InputData {
     ) {
         let returnval_handler = self.params.returnval.as_ref();
         let level = gpparams.level;
-        let rt_name = quote::format_ident!("{}Resultified{}", self.name, level.identpart());
-        let proxy_name = quote::format_ident!("{}Proxy{}", self.name, level.identpart());
+        let resultified_trait_name = self.resultified_trait_name(gpparams);
+        let proxy_name = self.proxy_name(gpparams);
         let fn_trait = level.fn_trait();
-        let enum_name = quote::format_ident!("{}Enum", self.name);
+        let enum_name = self.enum_name();
         let name = &self.name;
         let mut methods = TokenStream::new();
         for method in &self.methods {
@@ -392,7 +391,7 @@ impl InputData {
                 };
                 methods.extend(q! {
                     fn #method_name(#slf, #args_with_types ) #returntype {
-                        #rt_name::#rt_method_name(#slf2, #args_without_types).unwrap() #maybe_second_unwrap
+                        #resultified_trait_name::#rt_method_name(#slf2, #args_without_types).unwrap() #maybe_second_unwrap
                     }
                 });
             } else {

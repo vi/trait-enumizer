@@ -53,6 +53,18 @@ struct InputData {
     methods: Vec<Method>,
     params: Params,
 }
+impl InputData {
+    fn enum_name(&self) -> Ident {
+        quote::format_ident!("{}Enum", self.name)
+    }
+    fn resultified_trait_name(&self, gpparams : &GenProxyParams) -> Ident {
+        quote::format_ident!("{}Resultified{}", self.name, gpparams.level.identpart())
+    }
+
+    fn proxy_name(&self, gpparams : &GenProxyParams) -> Ident {
+        quote::format_ident!("{}Proxy{}", self.name, gpparams.level.identpart())
+    }
+}
 
 mod generate;
 mod parse_args;
