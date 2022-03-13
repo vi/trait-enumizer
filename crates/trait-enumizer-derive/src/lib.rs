@@ -53,26 +53,11 @@ struct InputData {
     params: Params,
 }
 impl InputData {
-    fn enum_name(&self) -> Ident {
-        if let Some(n) = &self.params.enum_name {
-            n.clone()
-        } else {
-            quote::format_ident!("{}Enum", self.name)
-        }
-    }
     fn resultified_trait_name(&self, gpparams: &GenProxyParams) -> Ident {
         if let Some(n) = &gpparams.traitname {
             n.clone()
         } else {
             quote::format_ident!("{}Resultified{}", self.name, gpparams.level.identpart())
-        }
-    }
-
-    fn proxy_name(&self, gpparams: &GenProxyParams) -> Ident {
-        if let Some(n) = &gpparams.name {
-            n.clone()
-        } else {
-            quote::format_ident!("{}Proxy{}", self.name, gpparams.level.identpart())
         }
     }
 }
@@ -89,7 +74,7 @@ struct GenProxyParams {
     gen_unwrapping: bool,
     gen_unwrapping_and_panicking: bool,
     extra_arg: Option<proc_macro2::TokenStream>,
-    name: Option<Ident>,
+    name: Ident,
     traitname: Option<Ident>,
 }
 impl GenProxyParams {
@@ -102,6 +87,7 @@ struct CallFnParams {
     level: ReceiverStyle,
     allow_panic: bool,
     extra_arg: Option<proc_macro2::TokenStream>,
+    name: Ident,
 }
 
 
@@ -114,16 +100,12 @@ enum AccessMode {
 
 
 struct Params {
-    ref_proxy: Option<GenProxyParams>,
-    mut_proxy: Option<GenProxyParams>,
-    once_proxy: Option<GenProxyParams>,
-    call_ref: Option<CallFnParams>,
-    call_mut: Option<CallFnParams>,
-    call_once: Option<CallFnParams>,
+    proxies: Vec<GenProxyParams>,
+    call_fns: Vec<CallFnParams>,
     access_mode: AccessMode,
     returnval: Option<proc_macro2::Ident>,
     enum_attr: Vec<proc_macro2::Group>,
-    enum_name: Option<Ident>,
+    enum_name: Ident,
     inherent_impl_mode : bool,
 }
 
@@ -156,76 +138,58 @@ pub fn enumizer(
 
     let caller_inconv = input_data.receiver_style_that_is_the_most_inconvenient_for_caller();
 
-    if let Some(g) = &params.call_once {
-        input_data.generate_call_fn(&mut ret, g);
-    }
-    if let Some(g) = &params.call_mut {
-        if caller_inconv == ReceiverStyle::Move && !g.allow_panic {
-            panic!("Cannot generate `call_mut` function because of trait have `self` methods. Use `call_mut(allow_panic)` to override.");
-        }
-        input_data.generate_call_fn(&mut ret, g);
-    }
-    if let Some(g) = &params.call_ref {
-        if caller_inconv != ReceiverStyle::Ref && !g.allow_panic {
-            panic!("Cannot generate `call` function because of trait have non-`&self` methods. Use `call(allow_panic)` to override.");
+    for g in &params.call_fns {
+        match g.level {
+            ReceiverStyle::Move => (),
+            ReceiverStyle::Mut => {
+                if caller_inconv == ReceiverStyle::Move && !g.allow_panic {
+                    panic!("Cannot generate `call_fn(ref_mut)` function because of trait have `self` methods. Use `call_fn(... ,allow_panic)` to override.");
+                }
+            }
+            ReceiverStyle::Ref => {
+                if caller_inconv != ReceiverStyle::Ref && !g.allow_panic {
+                    panic!("Cannot generate `call_fn(ref)` function because of trait have non-`&self` methods. Use `call_fn(... ,allow_panic)` to override.");
+                }
+            }
         }
         input_data.generate_call_fn(&mut ret, g);
     }
 
     let callee_inconv = input_data.receiver_style_that_is_the_most_inconvenient_for_callee();
 
-    if let Some(g) = &params.ref_proxy {
-        input_data.generate_resultified_trait(&mut ret, g);
-        input_data.generate_proxy(&mut ret, g);
+    for g in &params.proxies {
         if params.inherent_impl_mode && g.some_impl_requested() {
             panic!("Generating trait impls is incompatible with inherent_impl mode");
         }
+
         if g.gen_infallible {
             if params.returnval.is_some() {
                 panic!("infallible_impl and returnval are incompatible");
             }
-            input_data.generate_infallible_impl(&mut ret, g);
         }
-        if g.gen_unwrapping || g.gen_unwrapping_and_panicking {
-            input_data.generate_unwrapping_impl(&mut ret, g);
+        match g.level {
+            ReceiverStyle::Move => {
+                if g.gen_infallible || g.gen_unwrapping {
+                    if callee_inconv != ReceiverStyle::Move {
+                        panic!("The trait contains `&self` or `&mut self` methods. The FnOnce proxy cannot implement it - only for traits with solely `self` methods. Use `unwrapping_and_panicking_impl` to force generation and retain only some methods");
+                    }
+                }
+            }
+            ReceiverStyle::Mut => {
+                if g.gen_infallible || g.gen_unwrapping {
+                    if callee_inconv == ReceiverStyle::Ref {
+                        panic!("The trait contains &self methods. The FnMut proxy cannot implement it. Use `unwrapping_and_panicking_impl` to force generation and retain only some methods");
+                    }
+                }
+            }
+            ReceiverStyle::Ref => {
+               
+            }
         }
-    }
-    if let Some(g) = &params.mut_proxy {
+
         input_data.generate_resultified_trait(&mut ret, g);
         input_data.generate_proxy(&mut ret, g);
-        if params.inherent_impl_mode && g.some_impl_requested() {
-            panic!("Generating trait impls is incompatible with inherent_impl mode");
-        }
-        if g.gen_infallible || g.gen_unwrapping {
-            if callee_inconv == ReceiverStyle::Ref {
-                panic!("The trait contains &self methods. The mutable proxy cannot implement it. Use `unwrapping_and_panicking_impl` to force generation and retain only some methods");
-            }
-        }
         if g.gen_infallible {
-            if params.returnval.is_some() {
-                panic!("infallible_impl and returnval are incompatible");
-            }
-            input_data.generate_infallible_impl(&mut ret, g);
-        }
-        if g.gen_unwrapping || g.gen_unwrapping_and_panicking {
-            input_data.generate_unwrapping_impl(&mut ret, g);
-        }
-    }
-    if let Some(g) = &params.once_proxy {
-        input_data.generate_resultified_trait(&mut ret, g);
-        input_data.generate_proxy(&mut ret, g);
-        if params.inherent_impl_mode && g.some_impl_requested() {
-            panic!("Generating trait impls is incompatible with inherent_impl mode");
-        }
-        if g.gen_infallible || g.gen_unwrapping {
-            if callee_inconv != ReceiverStyle::Move {
-                panic!("The trait contains `&self` or `&mut self` methods. The once proxy cannot implement it - only for traits with solely `self` methods. Use `unwrapping_and_panicking_impl` to force generation and retain only some methods");
-            }
-        }
-        if g.gen_infallible {
-            if params.returnval.is_some() {
-                panic!("infallible_impl and returnval are incompatible");
-            }
             input_data.generate_infallible_impl(&mut ret, g);
         }
         if g.gen_unwrapping || g.gen_unwrapping_and_panicking {

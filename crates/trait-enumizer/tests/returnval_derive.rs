@@ -1,7 +1,7 @@
 #![cfg(feature="flume")]
 use trait_enumizer::flume_class;
 
-#[trait_enumizer::enumizer(returnval=flume_class,call(),ref_proxy(unwrapping_impl))]
+#[trait_enumizer::enumizer(name=MyIfaceEnum,returnval=flume_class,call_fn(name=try_call, ref),proxy(Fn,name=MyIfaceProxy,unwrapping_impl))]
 trait MyIface {
     fn foo(&self) -> String;
     fn bar(&self, x: i32) -> i32;

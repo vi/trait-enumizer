@@ -2,8 +2,8 @@ mod inner {
     #[trait_enumizer::enumizer(
         name=TheEnum,
         pub_crate,
-        call_mut(allow_panic),
-        ref_proxy(unwrapping_impl,name=TheCaller,traitname=ITheCaller),
+        call_fn(name=call_mut, ref_mut, allow_panic),
+        proxy(Fn,unwrapping_impl,name=TheCaller,resultified_trait=ITheCaller),
         enum_attr[derive(serde_derive::Serialize)]
     )]
     pub trait MyIface {

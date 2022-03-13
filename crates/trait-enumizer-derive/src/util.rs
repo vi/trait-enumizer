@@ -106,16 +106,6 @@ impl ReceiverStyle {
            (ReceiverStyle::Ref, true) => "try_call",
        }
    }
-   pub(crate) fn call_fn_ts(self, returnval: bool) -> TokenStream {
-       match (self, returnval) {
-          (ReceiverStyle::Move, false) => q!{call_once},
-          (ReceiverStyle::Mut, false) => q!{call_mut},
-          (ReceiverStyle::Ref, false) => q!{call},
-          (ReceiverStyle::Move, true) => q!{try_call_once},
-          (ReceiverStyle::Mut, true) =>  q!{try_call_mut},
-          (ReceiverStyle::Ref, true) =>  q!{try_call},
-      }
-  }
 }
 
 impl AccessMode {

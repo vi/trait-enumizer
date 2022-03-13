@@ -1,4 +1,4 @@
-#[trait_enumizer::enumizer(call(),ref_proxy(infallible_impl))]
+#[trait_enumizer::enumizer(name=MyIfaceEnum,call_fn(ref,name=call),proxy(name=MyIfaceProxy,Fn,  infallible_impl))]
 trait MyIface {
     fn primitive(&self, x: i32);
     fn by_value(&self, x: String);

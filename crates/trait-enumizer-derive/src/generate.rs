@@ -13,7 +13,7 @@ impl InputData {
         let returnval_handler = self.params.returnval.as_ref();
         let custom_attrs = &self.params.enum_attr[..];
         let pub_or_priv = self.params.access_mode.code();
-        let enum_name = self.enum_name();
+        let enum_name = &self.params.enum_name;
         let mut variants = TokenStream::new();
         for method in &self.methods {
             let variant_name = method.variant_name();
@@ -84,7 +84,8 @@ impl InputData {
         let returnval_handler = self.params.returnval.as_ref();
         let extra_arg = cfparams.extra_arg.as_ref();
         let level = cfparams.level;
-        let enum_name = self.enum_name();
+        let enum_name = &self.params.enum_name;
+        let fn_name = &cfparams.name;
         let mut variants = TokenStream::new();
         for method in &self.methods {
             let variant_name = quote::format_ident!(
@@ -158,7 +159,6 @@ impl InputData {
             });
         }
 
-        let fnname = level.call_fn_ts(returnval_handler.is_some());
         let input_trait_or_type_name = &self.name;
         let arg_o_with_type = match (self.params.inherent_impl_mode, level) {
             (false, ReceiverStyle::Move) => q! {mut o: I},
@@ -186,7 +186,7 @@ impl InputData {
         };
         out.extend(q! {
             impl #enum_name {
-                #pub_or_priv fn #fnname #maybe_requirement(self, #arg_o_with_type #maybe_extraarg) #maybe_returntype {
+                #pub_or_priv fn #fn_name #maybe_requirement(self, #arg_o_with_type #maybe_extraarg) #maybe_returntype {
                     match self {
                         #variants
                     }
@@ -247,9 +247,9 @@ impl InputData {
         let returnval_handler = self.params.returnval.as_ref();
         let extra_arg = gpparams.extra_arg.as_ref();
         let level = gpparams.level;
-        let enum_name = self.enum_name();
+        let enum_name = &self.params.enum_name;
         let resultified_trait_name = self.resultified_trait_name(gpparams);
-        let proxy_name = self.proxy_name(gpparams);
+        let proxy_name = &gpparams.name;
         //let name = &self.name;
         let mut methods = TokenStream::new();
         for method in &self.methods {
@@ -354,9 +354,9 @@ impl InputData {
         let returnval_handler = self.params.returnval.as_ref();
         let level = gpparams.level;
         let resultified_trait_name = self.resultified_trait_name(gpparams);
-        let proxy_name = self.proxy_name(gpparams);
+        let proxy_name = &gpparams.name;
         let fn_trait = level.fn_trait();
-        let enum_name = self.enum_name();
+        let enum_name = &self.params.enum_name;
         let name = &self.name;
         let mut methods = TokenStream::new();
         for method in &self.methods {

@@ -44,9 +44,10 @@ macro_rules! my_rpc_class {
 }
 
 #[trait_enumizer::enumizer(
+    name=MyIfaceEnum,
     returnval=my_rpc_class,
-    call_mut(extra_arg_type(&flume::Sender<String>)),
-    ref_proxy(unwrapping_impl,extra_field_type(MyRpcClient)),
+    call_fn(name=try_call_mut,ref_mut,extra_arg_type(&flume::Sender<String>)),
+    proxy(Fn,name=MyIfaceProxy,unwrapping_impl,extra_field_type(MyRpcClient)),
     enum_attr[derive(serde_derive::Serialize,serde_derive::Deserialize)]
 )]
 pub trait MyIface {
