@@ -347,15 +347,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio"
-version = "1.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2af73ac49756f3f7c01172e34a23e5d0216f6c32333757c2c61feb2bbff5a5ee"
-dependencies = [
- "pin-project-lite",
-]
-
-[[package]]
 name = "trait-enumizer"
 version = "0.1.0"
 dependencies = [
@@ -367,7 +358,6 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "slab",
- "tokio",
  "trait-enumizer-derive",
 ]
 
