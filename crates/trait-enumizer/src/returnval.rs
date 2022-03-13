@@ -22,3 +22,16 @@ macro_rules! flume_class {
     (send::<$T:ty>($channel:expr, $msg:expr)) => { ($channel).send($msg).map_err(|_| $crate::FailedToSendReturnValue) };
     (recv::<$T:ty>($channel:expr)) => { ($channel).recv() };
 }
+
+
+#[cfg(feature = "flume")]
+#[cfg_attr(docsrs, doc(cfg(feature = "flume")))]
+#[macro_export]
+macro_rules! async_flume_class {
+    (Sender<$T:ty>) => { ::flume::Sender<$T> };
+    (SendError) => { $crate::FailedToSendReturnValue };
+    (RecvError) => { ::flume::RecvError };
+    (create::<$T:ty>()) => { ::flume::bounded(1) };
+    (send::<$T:ty>($channel:expr, $msg:expr)) => { ($channel).send_async($msg).await.map_err(|_| $crate::FailedToSendReturnValue) };
+    (recv::<$T:ty>($channel:expr)) => { ($channel).recv_async().await };
+}
