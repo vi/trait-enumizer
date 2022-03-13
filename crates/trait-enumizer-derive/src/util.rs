@@ -81,14 +81,6 @@ impl ReceiverStyle {
         }
     }
 
-    pub(crate) fn identpart(self) -> &'static str {
-        match self {
-            ReceiverStyle::Move => "Once",
-            ReceiverStyle::Mut => "Mut",
-            ReceiverStyle::Ref => "",
-        }
-    }
-
     pub(crate) fn fn_trait(self) -> TokenStream {
          match self {
             ReceiverStyle::Move => q! {FnOnce},

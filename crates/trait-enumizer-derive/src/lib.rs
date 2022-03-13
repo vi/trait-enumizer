@@ -52,15 +52,6 @@ struct InputData {
     methods: Vec<Method>,
     params: Params,
 }
-impl InputData {
-    fn resultified_trait_name(&self, gpparams: &GenProxyParams) -> Ident {
-        if let Some(n) = &gpparams.traitname {
-            n.clone()
-        } else {
-            quote::format_ident!("{}Resultified{}", self.name, gpparams.level.identpart())
-        }
-    }
-}
 
 mod generate;
 mod parse_args;
@@ -187,7 +178,9 @@ pub fn enumizer(
             }
         }
 
-        input_data.generate_resultified_trait(&mut ret, g);
+        if g.traitname.is_some() {
+            input_data.generate_resultified_trait(&mut ret, g);
+        }
         input_data.generate_proxy(&mut ret, g);
         if g.gen_infallible {
             input_data.generate_infallible_impl(&mut ret, g);

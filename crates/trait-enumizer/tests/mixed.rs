@@ -3,7 +3,7 @@ mod inner {
         name=TheEnum,
         pub_crate,
         call_fn(name=call_mut, ref_mut, allow_panic),
-        proxy(Fn,unwrapping_impl,name=TheCaller,resultified_trait=ITheCaller),
+        proxy(Fn,unwrapping_impl,name=TheCaller),
         enum_attr[derive(serde_derive::Serialize)]
     )]
     pub trait MyIface {

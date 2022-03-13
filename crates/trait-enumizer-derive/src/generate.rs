@@ -202,7 +202,7 @@ impl InputData {
         let pub_or_priv = self.params.access_mode.code();
         let level = gpparams.level;
         let returnval_handler = self.params.returnval.as_ref();
-        let resultified_trait_name = self.resultified_trait_name(gpparams);
+        let resultified_trait_name = gpparams.traitname.as_ref().unwrap();
         //let name = &self.name;
         let mut methods = TokenStream::new();
         for method in &self.methods {
@@ -248,7 +248,7 @@ impl InputData {
         let extra_arg = gpparams.extra_arg.as_ref();
         let level = gpparams.level;
         let enum_name = &self.params.enum_name;
-        let resultified_trait_name = self.resultified_trait_name(gpparams);
+        let resultified_trait_name = gpparams.traitname.as_ref();
         let proxy_name = &gpparams.name;
         //let name = &self.name;
         let mut methods = TokenStream::new();
@@ -305,16 +305,22 @@ impl InputData {
             q!{}
         };
 
+        let maybe_trait_for_impl = if let Some(rtn) = resultified_trait_name {
+            q!{#rtn<E> for}
+        } else {
+            q!{}
+        };
+
         out.extend(q! {
             #pub_or_priv struct #proxy_name<E, F: #fn_trait(#enum_name)-> ::std::result::Result<(), E> > (pub F #maybe_extraarg);
 
-            impl<E, F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>> #resultified_trait_name<E> for #proxy_name<E, F> {
+            impl<E, F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>> #maybe_trait_for_impl #proxy_name<E, F> {
                 #methods
             }
         });
     }
     pub(crate) fn generate_infallible_impl(&self, out: &mut TokenStream, gpparams: &GenProxyParams) {
-        let resultified_trait_name = self.resultified_trait_name(gpparams);
+        let resultified_trait_name = gpparams.traitname.as_ref();
         let name = &self.name;
         let mut methods = TokenStream::new();
         for method in &self.methods {
@@ -333,17 +339,33 @@ impl InputData {
                 });
             }
             let slf = method.receiver_style.ts();
+            let methodcall = if resultified_trait_name.is_some() {
+                q! { R::#rt_method_name }
+            } else {
+                q! { Self::#rt_method_name }
+            };
             methods.extend(q! {
                 fn #method_name(#slf, #args_for_signature ) {
-                    R::#rt_method_name(self, #args_for_calling).unwrap()
+                    #methodcall(self, #args_for_calling).unwrap()
                 }
             });
         }
-        out.extend(q! {
-            impl<R:#resultified_trait_name<::std::convert::Infallible>> #name for R {
-                #methods
-            }
-        });
+        if let Some(rtn) = resultified_trait_name {
+            out.extend(q! {
+                impl<R:#rtn<::std::convert::Infallible>> #name for R {
+                    #methods
+                }
+            });
+        } else {
+            let proxy_name = &gpparams.name;
+            let fn_trait = gpparams.level.fn_trait();
+            let enum_name = &self.params.enum_name;
+            out.extend(q! {
+                impl<F: #fn_trait(#enum_name) -> ::std::result::Result<(), ::std::convert::Infallible>> #name for #proxy_name<::std::convert::Infallible, F> {
+                    #methods
+                }
+            });
+        }
     }
 
     pub(crate) fn generate_unwrapping_impl(
@@ -353,7 +375,7 @@ impl InputData {
     ) {
         let returnval_handler = self.params.returnval.as_ref();
         let level = gpparams.level;
-        let resultified_trait_name = self.resultified_trait_name(gpparams);
+        let resultified_trait_name = gpparams.traitname.as_ref();
         let proxy_name = &gpparams.name;
         let fn_trait = level.fn_trait();
         let enum_name = &self.params.enum_name;
@@ -397,9 +419,14 @@ impl InputData {
                     (ReceiverStyle::Move, ReceiverStyle::Mut) => q! {&mut self},
                     _ => q! {self},
                 };
+                let methodcall = if let Some(rtn) = resultified_trait_name {
+                    q! { #rtn::#rt_method_name }
+                } else {
+                    q! { Self::#rt_method_name }
+                };
                 methods.extend(q! {
                     fn #method_name(#slf, #args_with_types ) #returntype {
-                        #resultified_trait_name::#rt_method_name(#slf2, #args_without_types).unwrap() #maybe_second_unwrap
+                        #methodcall(#slf2, #args_without_types).unwrap() #maybe_second_unwrap
                     }
                 });
             } else {
