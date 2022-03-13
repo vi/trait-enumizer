@@ -16,14 +16,14 @@ Main piece of library is `enumizer` attribute macro. It should be attached to tr
 
 * `pub`, `pub_crate` - Mark generated items as `pub` or `pub(crate)` respectively
 * `returnval=<macro_class_name>` - Enable more complex mode where return values are handled. `call` functions turn into `try_call`. Input macros is used as a makeshift GAT trait with specialisation. There are a number of built-in channel classes and you can also have custom ones.
-* `call`, `call_mut`, `call_once` - Generate enum's inherent impl functions to apply the enum instance to various forms of the object.
+* `call()`, `call_mut()`, `call_once()` - Generate enum's inherent impl functions to apply the enum instance to various forms of the object.
     * `allow_panic` - Allow generation of the function with `panic!()` calls inside
     * `extra_arg_type(<type>)` - Add additional argument to the `try_call` function. That argument will appear on all `macro_class_name!(send(...))` callbacks.
-* `ref_proxy`, `mut_proxy`, `once_proxy` - Generate proxy struct to "convert" the trait to enum values, accepting `Fn`, `FnMut` and `FnOnce` respectively.
+* `ref_proxy()`, `mut_proxy()`, `once_proxy()` - Generate proxy struct to "convert" the trait to enum values, accepting `Fn`, `FnMut` and `FnOnce` respectively.
     * `infallible_impl` - Make the proxy also implement the original trait, provided your sink function does not err.
     * `unwrapping_impl` - Make the proxy also implement the original trait, using `unwrap` where needed.
     * `unwrapping_and_panicking_impl` - Force proxy to implement the original trait, using `panic!()` calls where complication would fail because of ownership requirements.
-    * `extra_field_type` - Add additional second field to proxy struct. That field will be used as additional argument to `macro_class_name!(create(...))` and `macro_class_name!(recv(...))` callbacks.
+    * `extra_field_type(...)` - Add additional second field to proxy struct. That field will be used as additional argument to `macro_class_name!(create(...))` and `macro_class_name!(recv(...))` callbacks.
     * `name=<ident>` - override the name of the generated struct
     * `traitname=<ident>` - override the name of the generated "resultified" trait
 * `enum_attr` - Inject custom attribute (e.g. `enum_attr[derive(serde_derive::Serialize)]`)  into enum declaration. Can be repeated. You need to use square brackets for this.

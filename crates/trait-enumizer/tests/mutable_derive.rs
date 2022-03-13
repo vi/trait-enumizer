@@ -1,4 +1,4 @@
-#[trait_enumizer::enumizer(call_mut,mut_proxy(infallible_impl))]
+#[trait_enumizer::enumizer(call_mut(),mut_proxy(infallible_impl))]
 trait MyIface {
     fn foo(&mut self);
     fn bar(&mut self, x: i32);

@@ -82,7 +82,6 @@ mod parse_args;
 mod parse_input;
 mod util;
 
-impl InputData {}
 
 struct GenProxyParams {
     level: ReceiverStyle,
@@ -94,18 +93,6 @@ struct GenProxyParams {
     traitname: Option<Ident>,
 }
 impl GenProxyParams {
-    fn new(level: ReceiverStyle) -> GenProxyParams {
-        GenProxyParams {
-            level,
-            gen_infallible: false,
-            gen_unwrapping: false,
-            gen_unwrapping_and_panicking: false,
-            extra_arg: None,
-            name: None,
-            traitname: None,
-        }
-    }
-
     fn some_impl_requested(&self) -> bool {
         self.gen_infallible || self.gen_unwrapping || self.gen_unwrapping_and_panicking
     }
@@ -116,15 +103,7 @@ struct CallFnParams {
     allow_panic: bool,
     extra_arg: Option<proc_macro2::TokenStream>,
 }
-impl CallFnParams {
-    fn new(level: ReceiverStyle) -> CallFnParams {
-        CallFnParams {
-            level,
-            allow_panic: false,
-            extra_arg: None,
-        }
-    }
-}
+
 
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 enum AccessMode {
@@ -132,13 +111,8 @@ enum AccessMode {
     Pub,
     PubCrate,
 }
-impl Default for AccessMode {
-    fn default() -> Self {
-        AccessMode::Priv
-    }
-}
 
-#[derive(Default)]
+
 struct Params {
     ref_proxy: Option<GenProxyParams>,
     mut_proxy: Option<GenProxyParams>,

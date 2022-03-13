@@ -1,4 +1,4 @@
-#[trait_enumizer::enumizer(call_once,once_proxy(infallible_impl))]
+#[trait_enumizer::enumizer(call_once(),once_proxy(infallible_impl))]
 trait MyIface {
     fn foo(self);
     fn bar(self, x: i32);

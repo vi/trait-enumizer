@@ -1,6 +1,6 @@
 struct Qqq;
 
-#[trait_enumizer::enumizer(inherent_impl, call, ref_proxy)]
+#[trait_enumizer::enumizer(inherent_impl, call(), ref_proxy())]
 impl Qqq {
     fn foo(&self) {
         dbg!("foo");

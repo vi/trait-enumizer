@@ -8,379 +8,308 @@ use crate::ReceiverStyle;
 use super::GenProxyParams;
 
 use super::Params;
+enum ParserState<I, G> {
+    ExpectingNewParam,
+    ExpectingIdent(I),
+    ExpectingEqsign(I),
+    ExpectingGroup(G),
+}
 
-pub(crate) fn parse_args(attrs: TokenStream) -> Params {
-    let mut params = Params::default();
-    let mut current_genproxy: Option<&mut GenProxyParams> = None;
-    let mut current_callfn: Option<&mut CallFnParams> = None;
-    let mut custom_attr_pending = false;
-    let mut returnval_eqsign_pending = false;
-    let mut returnval_ident_pending = false;
-    let mut name_eqsign_pending = false;
-    let mut name_ident_pending = false;
-    for x in attrs {
-        match x {
-            proc_macro2::TokenTree::Group(g) => {
-                if returnval_eqsign_pending {
-                    panic!("returnval should be followed by `=` character");
-                }
-                if returnval_ident_pending {
-                    panic!("returnval= should be followed by ident");
-                }
-                if name_eqsign_pending {
-                    panic!("name should be followed by `=` character");
-                }
-                if name_ident_pending {
-                    panic!("name= should be followed by ident");
-                }
-                if custom_attr_pending {
-                    params.enum_attr.push(g);
-                    custom_attr_pending = false;
-                    continue;
-                }
-                if g.delimiter() != proc_macro2::Delimiter::Parenthesis {
-                    panic!("Invalid input to `enumizer` attribute macro - non-round parentheses")
-                }
-                let mut claimed = false;
-                if let Some(cgp) = current_genproxy.take() {
-                    claimed = true;
-                    let mut ctr = 0;
-                    let mut extra_arg_expecting_value = false;
-                    let mut name_eqsign_pending = false;
-                    let mut name_ident_pending = false;
-                    let mut traitname_eqsign_pending = false;
-                    let mut traitname_ident_pending = false;
-                    for xx in g.stream() {
-                        if traitname_eqsign_pending || name_eqsign_pending {
-                            match xx {
-                                TokenTree::Punct(p) if p.as_char() == '=' => {
-                                   if traitname_eqsign_pending {
-                                       traitname_eqsign_pending = false;
-                                       traitname_ident_pending = true;
-                                   }
-                                   if name_eqsign_pending {
-                                       name_ident_pending = true;
-                                       name_eqsign_pending = false;
-                                   }
-                                   continue;
-                                }
-                                _ => panic!("Expected `=` character after [trait]name"),
-                            }
-                        }
-                        if name_ident_pending  {
-                            match xx {
-                                TokenTree::Ident(id) => {
-                                    cgp.name = Some(id);
-                                    name_ident_pending = false;
-                                    continue;
-                                }
-                                _ => panic!("Expected ident after name="),
-                            }
-                        }
-                        if traitname_ident_pending  {
-                            match xx {
-                                TokenTree::Ident(id) => {
-                                    cgp.traitname = Some(id);
-                                    traitname_ident_pending = false;
-                                    continue;
-                                }
-                                _ => panic!("Expected ident after traitname="),
-                            }
-                        }
-                        if extra_arg_expecting_value {
-                            match xx {
-                                proc_macro2::TokenTree::Group(g) => {
-                                    if g.delimiter() != proc_macro2::Delimiter::Parenthesis {
-                                        panic!("extra_field_type must be followed by ()");
-                                    }
-                                    cgp.extra_arg = Some(g.stream());
-                                    extra_arg_expecting_value = false;
-                                    continue;
-                                }
-                                _ => {
-                                    panic!("extra_field_type must be followed by ()");
-                                }
-                            }
-                        }
-                        match xx {
-                            proc_macro2::TokenTree::Group(_) => {
-                                panic!("Invalid input to `enumizer` attribute macro - no groups expected here")
-                            }
-                            proc_macro2::TokenTree::Ident(x) => match &*x.to_string() {
-                                "infallible_impl" => {
-                                    if cgp.gen_infallible {
-                                        panic!("Duplicate `infallible_impl`");
-                                    }
-                                    cgp.gen_infallible = true;
-                                    ctr += 1;
-                                }
-                                "unwrapping_impl" => {
-                                    if cgp.gen_unwrapping {
-                                        panic!("Duplicate `unwrapping_impl`");
-                                    }
-                                    cgp.gen_unwrapping = true;
-                                    ctr += 1;
-                                }
-                                "unwrapping_and_panicking_impl" => {
-                                    if cgp.gen_unwrapping_and_panicking {
-                                        panic!("Duplicate `unwrapping_impl`");
-                                    }
-                                    cgp.gen_unwrapping_and_panicking = true;
-                                    ctr += 1;
-                                }
-                                "extra_field_type" => {
-                                    if cgp.extra_arg.is_some() {
-                                        panic!("Duplicate `extra_field_type`. Use a tuple if you want to pass multiple values.");
-                                    }
-                                    extra_arg_expecting_value = true;
-                                }
-                                "name" => {
-                                    if cgp.name.is_some() {
-                                        panic!("Duplicate `name`");
-                                    }
-                                    name_eqsign_pending = true;
-                                }
-                                "traitname" => {
-                                    if cgp.traitname.is_some() {
-                                        panic!("Duplicate `traitname`");
-                                    }
-                                    traitname_eqsign_pending = true;
-                                }
-                                t => panic!("This suboption (`{}`) is not supported", t),
-                            },
-                            proc_macro2::TokenTree::Punct(p) => {
-                                if p.as_char() == ',' || p.as_char() == '\n'  {
-                                    // OK, ignoring it
-                                } else {
-                                    panic!("Invalid input to `enumizer` attribute macro - the only punctuation accepted is `,`");
-                                }
-                            }
-                            proc_macro2::TokenTree::Literal(_) => {
-                                panic!("Invalid input to `enumizer` attribute macro - no literals accepted here")
-                            }
-                        }
-                    }
-                    if name_eqsign_pending || traitname_eqsign_pending || name_ident_pending || traitname_ident_pending {
-                        panic!("Unfinished [trait]name=");
-                    }
-                    if extra_arg_expecting_value {
-                        panic!("Unfinished `extra_field_type`")
-                    }
+#[derive(Debug, Clone, Copy)]
+enum RootLevelIdentAssignmentTargets {
+    Returnval,
+    Name,
+}
+#[derive(Debug, Clone, Copy)]
+enum RootLevelGroupAssignmentTargets {
+    CallFn,
+    CustomAttr,
+    Proxy,
+}
 
-                    if ctr > 1 {
-                        panic!("Choose only one of infallible, unwrapping or unwrapping-and-panicking impl");
-                    }
-                }
+pub(crate) fn parse_args(input: TokenStream) -> Params {
+    let mut ref_proxy = None;
+    let mut mut_proxy = None;
+    let mut once_proxy = None;
+    let mut call_ref = None;
+    let mut call_mut = None;
+    let mut call_once = None;
+    let mut access_mode = AccessMode::Priv;
+    let mut returnval = None;
+    let mut enum_attr = vec![];
+    let mut enum_name = None;
+    let mut inherent_impl_mode = false;
 
-                if let Some(cfp) = current_callfn.take() {
-                    claimed = true;
-                    let mut extra_arg_expecting_value = false;
-                    for xx in g.stream() {
-                        if extra_arg_expecting_value {
-                            match xx {
-                                proc_macro2::TokenTree::Group(g) => {
-                                    if g.delimiter() != proc_macro2::Delimiter::Parenthesis {
-                                        panic!("extra_arg_type must be followed by ()");
-                                    }
-                                    cfp.extra_arg = Some(g.stream());
-                                    extra_arg_expecting_value = false;
-                                    continue;
-                                }
-                                _ => {
-                                    panic!("extra_arg_type must be followed by ()");
-                                }
-                            }
-                        }
-                        match xx {
-                            proc_macro2::TokenTree::Group(_) => {
-                                panic!("Invalid input to `enumizer` attribute macro - no groups in callfn params")
-                            }
-                            proc_macro2::TokenTree::Ident(x) => {
-                                match &*x.to_string() {
-                                    "allow_panic" => {
-                                        if cfp.allow_panic {
-                                            panic!("Duplicate `allow_panic`");
-                                        }
-                                        cfp.allow_panic = true;
-                                    }
-                                    "extra_arg_type" => {
-                                        if cfp.extra_arg.is_some() {
-                                            panic!("Duplicate `extra_arg_type`. Use a tuple if you want to pass multiple values.");
-                                        }
-                                        extra_arg_expecting_value = true;
-                                    }
-                                    t => panic!("This suboption (`{}`) is not supported", t),
-                                }
-                            }
-                            proc_macro2::TokenTree::Punct(p) => {
-                                if p.as_char() == ',' || p.as_char() == '\n' {
-                                    // OK, ignoring it
-                                } else {
-                                    panic!("Invalid input to `enumizer` attribute macro - non-`,` punct in callfn params");
-                                }
-                            }
-                            proc_macro2::TokenTree::Literal(_) => {
-                                panic!("Invalid input to `enumizer` attribute macro - literal unexpected in callnf params")
-                            }
-                        }
-                    }
-                    if  extra_arg_expecting_value {
-                        panic!("Unfinished `extra_arg_type(...)` subargument");
-                    }
-                }
-                if !claimed {
-                    panic!("Invalid input to `enumizer` attribute macro - unexpected group")
-                }
-            }
-            proc_macro2::TokenTree::Ident(x) => {
-                if returnval_eqsign_pending {
-                    panic!("returnval should be followed by `=` character");
-                }
-                if returnval_ident_pending {
-                    params.returnval = Some(x.clone());
-                    returnval_ident_pending = false;
-                    continue;
-                }
-                if name_eqsign_pending {
-                    panic!("`name` should be followed by `=` character");
-                }
-                if name_ident_pending {
-                    params.enum_name = Some(x.clone());
-                    name_ident_pending = false;
-                    continue;
-                }
-                if custom_attr_pending {
-                    panic!("custom_attr should be followed by a group");
-                }
-                match &*x.to_string() {
-                    "ref_proxy" => {
-                        if params.ref_proxy.is_some() {
-                            panic!("Duplicate `ref_proxy`");
-                        }
-                        params.ref_proxy = Some(GenProxyParams::new(ReceiverStyle::Ref));
-                        current_genproxy = params.ref_proxy.as_mut();
-                    }
-                    "mut_proxy" => {
-                        if params.mut_proxy.is_some() {
-                            panic!("Duplicate `ref_proxy`");
-                        }
-                        params.mut_proxy = Some(GenProxyParams::new(ReceiverStyle::Mut));
-                        current_genproxy = params.mut_proxy.as_mut();
-                    }
-                    "once_proxy" => {
-                        if params.once_proxy.is_some() {
-                            panic!("Duplicate `ref_proxy`");
-                        }
-                        params.once_proxy = Some(GenProxyParams::new(ReceiverStyle::Move));
-                        current_genproxy = params.once_proxy.as_mut();
-                    }
+    let mut state = ParserState::<RootLevelIdentAssignmentTargets,RootLevelGroupAssignmentTargets>::ExpectingNewParam;
+
+    use ParserState::*;
+    use RootLevelGroupAssignmentTargets::*;
+    use RootLevelIdentAssignmentTargets::*;
+
+    let mut cached_level = ReceiverStyle::Ref;
+
+    for x in input {
+        match state {
+            ExpectingNewParam => match x {
+                TokenTree::Ident(y) => match y.to_string().as_str() {
+                    "pub" => access_mode = AccessMode::Pub,
+                    "pub_crate" => access_mode = AccessMode::PubCrate,
+                    "priv" => access_mode = AccessMode::Priv,
+                    "returnval" => state = ExpectingEqsign(Returnval),
                     "call" => {
-                        if params.call_ref.is_some() {
-                            panic!("Duplicate `call`");
-                        }
-                        params.call_ref = Some(CallFnParams::new(ReceiverStyle::Ref));
-                        current_callfn = params.call_ref.as_mut();
+                        cached_level = ReceiverStyle::Ref;
+                        state = ExpectingGroup(CallFn)
                     }
                     "call_mut" => {
-                        if params.call_mut.is_some() {
-                            panic!("Duplicate `call`");
-                        }
-                        params.call_mut = Some(CallFnParams::new(ReceiverStyle::Mut));
-                        current_callfn = params.call_mut.as_mut();
+                        cached_level = ReceiverStyle::Mut;
+                        state = ExpectingGroup(CallFn)
                     }
                     "call_once" => {
-                        if params.call_once.is_some() {
-                            panic!("Duplicate `call`");
-                        }
-                        params.call_once = Some(CallFnParams::new(ReceiverStyle::Move));
-                        current_callfn = params.call_once.as_mut();
+                        cached_level = ReceiverStyle::Move;
+                        state = ExpectingGroup(CallFn)
                     }
-                    "pub" => {
-                        if params.access_mode != AccessMode::Priv {
-                            panic!("Duplicate `pub` or `pub_crate`");
-                        }
-                        params.access_mode = AccessMode::Pub;
+                    "ref_proxy" => {
+                        cached_level = ReceiverStyle::Ref;
+                        state = ExpectingGroup(Proxy)
                     }
-                    "pub_crate" => {
-                        if params.access_mode != AccessMode::Priv {
-                            panic!("Duplicate `pub` or `pub_crate`");
-                        }
-                        params.access_mode = AccessMode::PubCrate;
+                    "mut_proxy" => {
+                        cached_level = ReceiverStyle::Mut;
+                        state = ExpectingGroup(Proxy)
                     }
-                    "returnval" => {
-                        if params.returnval.is_some() {
-                            panic!("Duplicate `returnval`");
-                        }
-                        returnval_eqsign_pending = true;
+                    "once_proxy" => {
+                        cached_level = ReceiverStyle::Move;
+                        state = ExpectingGroup(Proxy)
                     }
-                    "enum_attr" => {
-                        custom_attr_pending = true;
-                    }
-                    "name" => {
-                        if params.enum_name.is_some() {
-                            panic!("Duplicate `name`");
-                        }
-                        name_eqsign_pending = true;
-                    }
-                    "inherent_impl" => {
-                        if params.inherent_impl_mode {
-                            panic!("Duplicate `inherent_impl`");
-                        }
-                        params.inherent_impl_mode = true;
-                    }
-                    t => panic!("This option (`{}`) is not supported", t),
+                    "enum_attr" => state = ExpectingGroup(CustomAttr),
+                    "name" => state = ExpectingEqsign(Name),
+                    "inherent_impl" => inherent_impl_mode = true,
+                    z => panic!("Unknown parameter {}", z),
+                },
+                TokenTree::Group(_) => panic!("No group is expected here"),
+                TokenTree::Punct(y) if y.as_char() == ',' => (),
+                TokenTree::Punct(_) => panic!("No punctuation is expected here"),
+                TokenTree::Literal(_) => panic!("No literal is expected here"),
+            },
+            ExpectingIdent(t) => {
+                match x {
+                    TokenTree::Ident(y) => match t {
+                        Returnval => returnval = Some(y),
+                        Name => enum_name = Some(y),
+                    },
+                    _ => panic!(
+                        "Single identifier is expected in {:?} state after `=` sign",
+                        t
+                    ),
                 }
+                state = ExpectingNewParam;
             }
-            proc_macro2::TokenTree::Punct(x) => {
-                if returnval_ident_pending {
-                    panic!("returnval= should be followed by ident");
+            ExpectingEqsign(t) => match x {
+                TokenTree::Punct(y) if y.as_char() == '=' => state = ExpectingIdent(t),
+                _ => panic!("Expected `=` character after parameter for {:?}", t),
+            },
+            ExpectingGroup(t) => {
+                match x {
+                    TokenTree::Group(y) => match t {
+                        CallFn => match cached_level {
+                            ReceiverStyle::Move => {
+                                call_once = Some(parse_call_fn(y.stream(), cached_level))
+                            }
+                            ReceiverStyle::Mut => {
+                                call_mut = Some(parse_call_fn(y.stream(), cached_level))
+                            }
+                            ReceiverStyle::Ref => {
+                                call_ref = Some(parse_call_fn(y.stream(), cached_level))
+                            }
+                        },
+                        CustomAttr => enum_attr.push(y),
+                        Proxy => match cached_level {
+                            ReceiverStyle::Move => {
+                                once_proxy = Some(parse_proxy(y.stream(), cached_level))
+                            }
+                            ReceiverStyle::Mut => {
+                                mut_proxy = Some(parse_proxy(y.stream(), cached_level))
+                            }
+                            ReceiverStyle::Ref => {
+                                ref_proxy = Some(parse_proxy(y.stream(), cached_level))
+                            }
+                        },
+                    },
+                    _ => panic!("Expected a group after parameter for {:?}", t),
                 }
-                if name_ident_pending {
-                    panic!("name= should be followed by ident");
-                }
-                if returnval_eqsign_pending {
-                    if x.as_char() != '=' {
-                        panic!("returnval should be followed by `=` character");
-                    }
-                    returnval_eqsign_pending = false;
-                    returnval_ident_pending = true;
-                    continue;
-                }
-                if name_eqsign_pending {
-                    if x.as_char() != '=' {
-                        panic!("`name` should be followed by `=` character");
-                    }
-                    name_eqsign_pending = false;
-                    name_ident_pending = true;
-                    continue;
-                }
-                if custom_attr_pending {
-                    panic!("custom_attr should be followed by a group");
-                }
-                if x.as_char() == ',' || x.as_char() == '\n'  {
-                    current_callfn = None;
-                    current_genproxy = None;
-                } else {
-                    panic!("Invalid input to `enumizer` attribute macro - non-comma punct");
-                }
-            }
-            proc_macro2::TokenTree::Literal(_) => {
-                panic!("Invalid input to `enumizer` attribute macro - no literals expected")
+                state = ExpectingNewParam
             }
         }
     }
-    if returnval_ident_pending || returnval_eqsign_pending {
-        panic!("Unfinished `returnval=...` argument");
+
+    Params {
+        ref_proxy,
+        mut_proxy,
+        once_proxy,
+        call_ref,
+        call_mut,
+        call_once,
+        access_mode,
+        returnval,
+        enum_attr,
+        enum_name,
+        inherent_impl_mode,
     }
-    if name_eqsign_pending || name_ident_pending {
-        panic!("Unfinished `name=...` argument");
+}
+
+#[derive(Debug, Clone, Copy)]
+enum CallFnIdentAssignmentTargets {}
+#[derive(Debug, Clone, Copy)]
+enum CallFnGroupAssignmentTargets {
+    ExtraArgType,
+}
+
+#[allow(unused)]
+fn parse_call_fn(input: TokenStream, level: ReceiverStyle) -> CallFnParams {
+    let mut allow_panic = false;
+    let mut extra_arg = None;
+
+    let mut state = ParserState::<CallFnIdentAssignmentTargets,CallFnGroupAssignmentTargets>::ExpectingNewParam;
+
+    use CallFnGroupAssignmentTargets::*;
+    use CallFnIdentAssignmentTargets::*;
+    use ParserState::*;
+
+    for x in input {
+        match state {
+            ExpectingNewParam => match x {
+                TokenTree::Ident(y) => match y.to_string().as_str() {
+                    "allow_panic" => allow_panic = true,
+                    "deny_panic" => allow_panic = false,
+                    "extra_arg_type" => state = ExpectingGroup(ExtraArgType),
+                    z => panic!("Unknown subparameter {}", z),
+                },
+                TokenTree::Punct(y) if y.as_char() == ',' => (),
+                _ => panic!("Expecting some call_fn subparameter, got {:?}", x),
+            },
+            ExpectingIdent(t) => {
+                match x {
+                    TokenTree::Ident(y) => match t {},
+                    _ => panic!(
+                        "Single identifier is expected in {:?} state after `=` sign",
+                        t
+                    ),
+                }
+                state = ExpectingNewParam;
+            }
+            ExpectingEqsign(t) => match x {
+                TokenTree::Punct(y) if y.as_char() == '=' => state = ExpectingIdent(t),
+                _ => panic!("Expected `=` character after parameter for {:?}", t),
+            },
+            ExpectingGroup(t) => {
+                match x {
+                    TokenTree::Group(y) => match t {
+                        ExtraArgType => extra_arg = Some(y.stream()),
+                    },
+                    _ => panic!("Expected a group after parameter for {:?}", t),
+                }
+                state = ExpectingNewParam;
+            }
+        }
     }
-    params
+
+    CallFnParams {
+        level,
+        allow_panic,
+        extra_arg,
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ProxyIdentAssignmentTargets {
+    Name,
+    TraitName,
+}
+#[derive(Debug, Clone, Copy)]
+enum ProxyGroupAssignmentTargets {
+    ExtraFieldType,
+}
+
+fn parse_proxy(input: TokenStream, level: ReceiverStyle) -> GenProxyParams {
+    let mut gen_infallible = false;
+    let mut gen_unwrapping = false;
+    let mut gen_unwrapping_and_panicking = false;
+    let mut extra_arg = None;
+    let mut name = None;
+    let mut traitname = None;
+
+    let mut state =
+        ParserState::<ProxyIdentAssignmentTargets, ProxyGroupAssignmentTargets>::ExpectingNewParam;
+
+    use ParserState::*;
+    use ProxyGroupAssignmentTargets::*;
+    use ProxyIdentAssignmentTargets::*;
+
+    for x in input {
+        match state {
+            ExpectingNewParam => match x {
+                TokenTree::Ident(y) => match y.to_string().as_str() {
+                    "infallible_impl" => gen_infallible = true,
+                    "unwrapping_impl" => gen_unwrapping = true,
+                    "unwrapping_and_panicking_impl" => gen_unwrapping_and_panicking = true,
+                    "extra_field_type" => state = ExpectingGroup(ExtraFieldType),
+                    "name" => state = ExpectingEqsign(Name),
+                    "traitname" => state = ExpectingEqsign(TraitName),
+                    z => panic!("Unknown subparameter {}", z),
+                },
+                TokenTree::Punct(y) if y.as_char() == ',' => (),
+                _ => panic!("Expecting some proxy subparameter, got {:?}", x),
+            },
+            ExpectingIdent(t) => {
+                match x {
+                    TokenTree::Ident(y) => match t {
+                        Name => name = Some(y),
+                        TraitName => traitname = Some(y),
+                    },
+                    _ => panic!(
+                        "Single identifier is expected in {:?} state after `=` sign",
+                        t
+                    ),
+                }
+                state = ExpectingNewParam;
+            }
+            ExpectingEqsign(t) => match x {
+                TokenTree::Punct(y) if y.as_char() == '=' => state = ExpectingIdent(t),
+                _ => panic!("Expected `=` character after parameter for {:?}", t),
+            },
+            ExpectingGroup(t) => {
+                match x {
+                    TokenTree::Group(y) => match t {
+                        ExtraFieldType => extra_arg = Some(y.stream()),
+                    },
+                    _ => panic!("Expected a group after parameter for {:?}", t),
+                }
+                state = ExpectingNewParam;
+            }
+        }
+    }
+
+    let mut ctr = 0;
+    if gen_infallible { ctr += 1; }
+    if gen_unwrapping { ctr += 1; }
+    if gen_unwrapping_and_panicking { ctr += 1; }
+    if ctr > 1 {
+        panic!("Choose only one of infallible or unwrapping impl")
+    }
+
+    GenProxyParams {
+        level,
+        gen_infallible,
+        gen_unwrapping,
+        gen_unwrapping_and_panicking,
+        extra_arg,
+        name,
+        traitname,
+    }
 }
 
 #[test]
 fn test_parser1() {
-    let attrs = parse_args(quote::quote! { });
+    let attrs = parse_args(quote::quote! {});
     assert_eq!(attrs.access_mode, AccessMode::Priv);
     assert!(attrs.call_ref.is_none());
     assert!(attrs.call_mut.is_none());
@@ -392,10 +321,9 @@ fn test_parser1() {
     assert!(attrs.returnval.is_none());
 }
 
-
 #[test]
 fn test_parser2() {
-    let attrs = parse_args(quote::quote! { 
+    let attrs = parse_args(quote::quote! {
         returnval=my_rpc_class,
         call(extra_arg_type(i32)),
         call_mut(extra_arg_type(&flume::Sender<String>)),
@@ -410,22 +338,43 @@ fn test_parser2() {
     assert_eq!(attrs.call_ref.as_ref().unwrap().allow_panic, false);
     assert_eq!(attrs.call_mut.as_ref().unwrap().allow_panic, false);
     assert_eq!(attrs.call_once.as_ref().unwrap().allow_panic, true);
-    
+
     assert!(attrs.call_ref.as_ref().unwrap().extra_arg.is_some());
     assert!(attrs.call_mut.as_ref().unwrap().extra_arg.is_some());
     assert!(attrs.call_once.as_ref().unwrap().extra_arg.is_none());
 
     assert_eq!(attrs.ref_proxy.as_ref().unwrap().gen_unwrapping, true);
     assert_eq!(attrs.ref_proxy.as_ref().unwrap().gen_infallible, false);
-    assert_eq!(attrs.ref_proxy.as_ref().unwrap().gen_unwrapping_and_panicking, false);
+    assert_eq!(
+        attrs
+            .ref_proxy
+            .as_ref()
+            .unwrap()
+            .gen_unwrapping_and_panicking,
+        false
+    );
 
     assert_eq!(attrs.mut_proxy.as_ref().unwrap().gen_unwrapping, false);
     assert_eq!(attrs.mut_proxy.as_ref().unwrap().gen_infallible, true);
-    assert_eq!(attrs.mut_proxy.as_ref().unwrap().gen_unwrapping_and_panicking, false);
+    assert_eq!(
+        attrs
+            .mut_proxy
+            .as_ref()
+            .unwrap()
+            .gen_unwrapping_and_panicking,
+        false
+    );
 
     assert_eq!(attrs.once_proxy.as_ref().unwrap().gen_unwrapping, false);
     assert_eq!(attrs.once_proxy.as_ref().unwrap().gen_infallible, false);
-    assert_eq!(attrs.once_proxy.as_ref().unwrap().gen_unwrapping_and_panicking, true);
+    assert_eq!(
+        attrs
+            .once_proxy
+            .as_ref()
+            .unwrap()
+            .gen_unwrapping_and_panicking,
+        true
+    );
 
     assert_eq!(attrs.enum_attr.len(), 2);
     assert_eq!(attrs.returnval.unwrap().to_string(), "my_rpc_class");
