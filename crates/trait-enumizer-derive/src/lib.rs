@@ -23,6 +23,7 @@ struct Method {
     ret: Option<syn::Type>,
     enum_attr: Vec<proc_macro2::Group>,
     return_attr: Vec<proc_macro2::Group>,
+    r#async: bool,
 }
 
 impl Method {
@@ -67,6 +68,7 @@ struct GenProxyParams {
     extra_arg: Option<proc_macro2::TokenStream>,
     name: Ident,
     traitname: Option<Ident>,
+    r#async: bool,
 }
 impl GenProxyParams {
     fn some_impl_requested(&self) -> bool {
@@ -79,6 +81,7 @@ struct CallFnParams {
     allow_panic: bool,
     extra_arg: Option<proc_macro2::TokenStream>,
     name: Ident,
+    r#async: bool,
 }
 
 

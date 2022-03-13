@@ -120,6 +120,7 @@ fn parse_call_fn(input: TokenStream) -> CallFnParams {
     let mut allow_panic = false;
     let mut extra_arg = None;
     let mut name = None;
+    let mut r#async = false;
 
     let mut state = ParserState::<CallFnIdentAssignmentTargets,CallFnGroupAssignmentTargets>::ExpectingNewParam;
 
@@ -133,6 +134,8 @@ fn parse_call_fn(input: TokenStream) -> CallFnParams {
                 TokenTree::Ident(y) => match y.to_string().as_str() {
                     "allow_panic" => allow_panic = true,
                     "deny_panic" => allow_panic = false,
+                    "async" => r#async = true,
+                    "no_async" => r#async = false,
                     "extra_arg_type" => state = ExpectingGroup(ExtraArgType),
                     "ref" => level = Some(ReceiverStyle::Ref),
                     "ref_mut" | "mut_ref" => level = Some(ReceiverStyle::Mut),
@@ -182,6 +185,7 @@ fn parse_call_fn(input: TokenStream) -> CallFnParams {
         name,
         allow_panic,
         extra_arg,
+        r#async,
     }
 }
 
@@ -203,6 +207,7 @@ fn parse_proxy(input: TokenStream) -> GenProxyParams {
     let mut name = None;
     let mut traitname = None;
     let mut level = None;
+    let mut r#async = false;
 
     let mut state =
         ParserState::<ProxyIdentAssignmentTargets, ProxyGroupAssignmentTargets>::ExpectingNewParam;
@@ -227,6 +232,8 @@ fn parse_proxy(input: TokenStream) -> GenProxyParams {
                     "extra_field_type" => state = ExpectingGroup(ExtraFieldType),
                     "name" => state = ExpectingEqsign(Name),
                     "resultified_trait" => state = ExpectingEqsign(TraitName),
+                    "async" => r#async = true,
+                    "no_async" => r#async = false,
                     z => panic!("Unknown subparameter {}", z),
                 },
                 TokenTree::Punct(y) if y.as_char() == ',' => (),
@@ -274,6 +281,9 @@ fn parse_proxy(input: TokenStream) -> GenProxyParams {
     if ctr > 1 {
         panic!("Choose only one of infallible or unwrapping impl")
     }
+    if r#async && ctr > 0 {
+        panic!("async is incompatible with any impls");
+    }
 
     let name = name.expect("`name` subparameter is required.");
     let level = level.expect("Set one of `Fn`, `FnMut` or `FnOnce` subparameters");
@@ -286,6 +296,7 @@ fn parse_proxy(input: TokenStream) -> GenProxyParams {
         extra_arg,
         name,
         traitname,
+        r#async,
     }
 }
 

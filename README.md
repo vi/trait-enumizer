@@ -24,6 +24,7 @@ Main piece of library is `enumizer` attribute macro. It should be attached to tr
     * `name=<ident>` - name of the inherent method.
     * `allow_panic` - Allow generation of the function with `panic!()` calls inside
     * `extra_arg_type(<type>)` - Add additional argument to the `try_call` function. That argument will appear on all `macro_class_name!(send(...))` callbacks.
+    * `async` - Generate `async fn`.
 * `proxy()` - Generate proxy struct to "convert" the trait to enum values. Proxy is a tuple struct. First field is your `Fn`, `FnMut` or `FnOnce` closure. You can also add second field using special parameter.
     * `Fn`, `FnMut`, `FnOnce` - Set type of closure that the proxy will carry.
     * `name=<ident>` - name of the generated struct. Required.
@@ -32,6 +33,7 @@ Main piece of library is `enumizer` attribute macro. It should be attached to tr
     * `unwrapping_impl` - Make the proxy also implement the original trait, using `unwrap` where needed.
     * `unwrapping_and_panicking_impl` - Force proxy to implement the original trait, using `panic!()` calls where complication would fail because of ownership requirements.
     * `extra_field_type(...)` - Add additional second field to proxy struct. That field will be used as additional argument to `macro_class_name!(create(...))` and `macro_class_name!(recv(...))` callbacks.
+    * `async` - Expect user-specified closure to return `Future<Output=Result>` instead of just `Result` and use `.await`s inside where appropriate.
 
 
 Example of attributes syntax:

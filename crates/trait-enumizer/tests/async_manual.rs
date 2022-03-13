@@ -49,8 +49,22 @@ impl QqqEnum {
     }
 }
 
-struct QqqProxy<E, Fu: std::future::Future<Output = Result<(), E>>, F: Fn(QqqEnum) -> Fu>(F);
-impl<E, Fu: std::future::Future<Output = Result<(), E>>, F: Fn(QqqEnum) -> Fu> QqqProxy<E, Fu, F> {
+struct QqqUsualProxy<E, F: Fn(QqqEnum) -> Result<(), E>>(F);
+impl<E, F: Fn(QqqEnum) -> Result<(), E>> QqqUsualProxy<E, F> {
+    fn try_foo(&self) -> Result<(), E> {
+        self.0(QqqEnum::Foo)
+    }
+
+    fn try_bar(&self, x: i32) -> Result<(), E> {
+        self.0(QqqEnum::Bar { x })
+    }
+
+    fn try_baz(&self, y: String, z: Vec<u8>) -> Result<(), E> {
+        self.0(QqqEnum::Baz { y, z })
+    }
+}
+struct QqqAsyncProxy<E, F: Fn(QqqEnum) -> Fu, Fu: std::future::Future<Output = Result<(), E>>>(F);
+impl<E, F: Fn(QqqEnum) -> Fu, Fu: std::future::Future<Output = Result<(), E>>> QqqAsyncProxy<E, F, Fu> {
     async fn try_foo(&self) -> Result<(), E> {
         self.0(QqqEnum::Foo).await
     }
@@ -67,11 +81,22 @@ impl<E, Fu: std::future::Future<Output = Result<(), E>>, F: Fn(QqqEnum) -> Fu> Q
 // End of the part which is supposed to be auto-generated
 
 #[test]
-fn simple() {
+fn async_to_async() {
     let o = Qqq {};
-    let p = QqqProxy::<std::convert::Infallible, _, _>(|c: QqqEnum| async { Ok(c.call(&o).await) });
+    let p = QqqAsyncProxy::<std::convert::Infallible, _, _>(|c: QqqEnum| async { Ok(c.call(&o).await) });
 
     futures::executor::block_on(p.try_foo()).unwrap();
     futures::executor::block_on(p.try_bar(4)).unwrap();
     futures::executor::block_on(p.try_baz("qqq".to_owned(), vec![])).unwrap();
+}
+
+
+#[test]
+fn usual_to_async() {
+    let o = Qqq {};
+    let p = QqqUsualProxy::<std::convert::Infallible, _>(|c: QqqEnum| Ok(futures::executor::block_on(c.call(&o))));
+
+    p.try_foo().unwrap();
+    p.try_bar(4).unwrap();
+    p.try_baz("qqq".to_owned(), vec![]).unwrap();
 }

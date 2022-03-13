@@ -119,16 +119,23 @@ impl InputData {
                     ret,
                 });
             }
-            let can_do_it = match (level, method.receiver_style) {
+            let can_do_it1 = match (level, method.receiver_style) {
                 (ReceiverStyle::Move, _) => true,
                 (ReceiverStyle::Mut, ReceiverStyle::Move) => false,
                 (ReceiverStyle::Mut, _) => true,
                 (ReceiverStyle::Ref, ReceiverStyle::Ref) => true,
                 (ReceiverStyle::Ref, _) => false,
             };
-            let action = if can_do_it {
+            let can_do_it2 = match (cfparams.r#async, method.r#async) {
+                (false, true) => false,
+                _ => true,
+            };
+            let action = if can_do_it1 && can_do_it2 {
                 if let Some(return_type) = &method.ret {
                     if let Some(returnval_handler_macro) = returnval_handler {
+                        if method.r#async {
+                            panic!("Async methods with return types are not yet supported");
+                        }
                         let maybe_extraarg = if extra_arg.is_some() {
                             q!{, extra_arg}
                         } else {
@@ -139,10 +146,15 @@ impl InputData {
                         unreachable!("parsing function should have already rejected this case");
                     }
                 } else {
-                    if returnval_handler.is_none() {
-                        q! {o.#method_name(#variant_params)}
+                    let maybe_await = if method.r#async {
+                        q!{.await}
                     } else {
-                        q! {Ok(o.#method_name(#variant_params))}
+                        q!{}
+                    };
+                    if returnval_handler.is_none() {
+                        q! {o.#method_name(#variant_params) #maybe_await}
+                    } else {
+                        q! {Ok(o.#method_name(#variant_params) #maybe_await)}
                     }
                 }
             } else {
@@ -152,7 +164,17 @@ impl InputData {
                     level.call_fn_name(returnval_handler.is_some())
                 ));
                 let literal2 = proc_macro2::Literal::string(&method_name.to_string());
-                q! {panic!("Cannot call `{}` from `{}` due to incompative `self` access mode", #literal2, #literal1)}
+                if !can_do_it1 {
+                    q! {panic!("Cannot call `{}` from `{}` due to incompative `self` access mode", #literal2, #literal1)}
+                } else if !can_do_it2 {
+                    if cfparams.allow_panic {
+                        q! {panic!("Cannot call `{}` from `{}` due it being async and the generated function not being async", #literal2, #literal1)}
+                    } else {
+                        panic!("Cannot call `{}` from `{}` due it being async and the generated function not being async. Use `allow_panic` subparameter to override or add `async` subparameter.", literal2, literal1);
+                    }
+                } else {
+                    unreachable!()
+                }
             };
             variants.extend(q! {
                 #enum_name::#variant_name { #variant_params_with_ret } => #action,
@@ -184,9 +206,14 @@ impl InputData {
         } else {
             q!{}
         };
+        let maybe_async = if cfparams.r#async {
+            q!{async}
+        } else {
+            q!{}
+        };
         out.extend(q! {
             impl #enum_name {
-                #pub_or_priv fn #fn_name #maybe_requirement(self, #arg_o_with_type #maybe_extraarg) #maybe_returntype {
+                #pub_or_priv #maybe_async fn #fn_name #maybe_requirement(self, #arg_o_with_type #maybe_extraarg) #maybe_returntype {
                     match self {
                         #variants
                     }
@@ -206,6 +233,9 @@ impl InputData {
         //let name = &self.name;
         let mut methods = TokenStream::new();
         for method in &self.methods {
+            if method.r#async {
+                panic!("Resultified traits are not compatible with async methods");
+            }
             let rt_method_name = quote::format_ident!("try_{}", method.name,);
             // let method_name = &method.name;
             let mut args = TokenStream::new();
@@ -250,6 +280,11 @@ impl InputData {
         let enum_name = &self.params.enum_name;
         let resultified_trait_name = gpparams.traitname.as_ref();
         let proxy_name = &gpparams.name;
+        let pub_or_priv2 = if resultified_trait_name.is_some() {
+            q!{}
+        } else {
+            pub_or_priv.clone()
+        };
         //let name = &self.name;
         let mut methods = TokenStream::new();
         for method in &self.methods {
@@ -275,7 +310,15 @@ impl InputData {
                 }
             }
             let slf = level.ts();
+            let maybe_async = if gpparams.r#async {
+                q!{async}
+            } else {
+                q!{}
+            };
             if let Some(rt) = &method.ret {
+                if gpparams.r#async {
+                    panic!("Async and returnval are not yet supported together for proxies");
+                }
                 let returnval_handler_macro = returnval_handler.unwrap();
                 let (maybe_extraarg_with_comma, maybe_extraarg) = if let Some(_eat) = extra_arg {
                     (q!{, self.1}, q!{self.1})
@@ -283,16 +326,21 @@ impl InputData {
                     (q!{}, q!{})
                 };
                 methods.extend(q! {
-                    fn #rt_method_name(#slf, #args_with_types_for_signature ) -> ::std::result::Result<::std::result::Result<#rt, #returnval_handler_macro ! (RecvError)>, E> {
+                    #pub_or_priv2 #maybe_async fn #rt_method_name(#slf, #args_with_types_for_signature ) -> ::std::result::Result<::std::result::Result<#rt, #returnval_handler_macro ! (RecvError)>, E> {
                         let (tx, rx) = #returnval_handler_macro !(create::<#rt>(#maybe_extraarg));
                         self.0(#enum_name::#variant_name { #enum_variant_fields ret: tx })?;
                         Ok(#returnval_handler_macro ! (recv::<#rt>(rx #maybe_extraarg_with_comma) ) )
                     }
                 });
             } else {
+                let maybe_await = if gpparams.r#async {
+                    q!{.await}
+                } else {
+                    q!{}
+                };
                 methods.extend(q! {
-                    fn #rt_method_name(#slf, #args_with_types_for_signature ) -> ::std::result::Result<(), E> {
-                        self.0(#enum_name::#variant_name{ #enum_variant_fields })
+                    #pub_or_priv2 #maybe_async fn #rt_method_name(#slf, #args_with_types_for_signature ) -> ::std::result::Result<(), E> {
+                        self.0(#enum_name::#variant_name{ #enum_variant_fields }) #maybe_await
                     }
                 });
             };
@@ -311,10 +359,24 @@ impl InputData {
             q!{}
         };
 
-        out.extend(q! {
-            #pub_or_priv struct #proxy_name<E, F: #fn_trait(#enum_name)-> ::std::result::Result<(), E> > (pub F #maybe_extraarg);
+        #[allow(non_snake_case)]
+        let F_and_maybe_Fu_genparams = if gpparams.r#async {
+            q!{ F: #fn_trait(#enum_name) -> Fu, Fu: ::std::future::Future<Output = ::std::result::Result<(), E>>  }
+        } else {
+            q!{ F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>  }
+        };
 
-            impl<E, F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>> #maybe_trait_for_impl #proxy_name<E, F> {
+        #[allow(non_snake_case)]
+        let maybe_Fu = if gpparams.r#async {
+            q!{, Fu}
+        } else {
+            q!{}
+        };
+
+        out.extend(q! {
+            #pub_or_priv struct #proxy_name<E, #F_and_maybe_Fu_genparams > (pub F #maybe_extraarg);
+
+            impl<E, #F_and_maybe_Fu_genparams> #maybe_trait_for_impl #proxy_name<E, F #maybe_Fu> {
                 #methods
             }
         });
@@ -324,6 +386,9 @@ impl InputData {
         let name = &self.name;
         let mut methods = TokenStream::new();
         for method in &self.methods {
+            if method.r#async {
+                panic!("Generating trait impls for async methods is not supported");
+            }
             let rt_method_name = quote::format_ident!("try_{}", method.name,);
             let method_name = &method.name;
             let mut args_for_signature = TokenStream::new();
@@ -382,6 +447,9 @@ impl InputData {
         let name = &self.name;
         let mut methods = TokenStream::new();
         for method in &self.methods {
+            if method.r#async {
+                panic!("Generating trait impls for async methods is not supported");
+            }
             let rt_method_name = quote::format_ident!("try_{}", method.name,);
             let method_name = &method.name;
             let mut args_with_types = TokenStream::new();

@@ -110,9 +110,7 @@ fn parse_method(
     if method_signature.constness.is_some() {
         panic!("Trait-enumizer does not support const");
     }
-    if method_signature.asyncness.is_some() {
-        panic!("Trait-enumizer does not support async");
-    }
+    let r#async = method_signature.asyncness.is_some();
     if method_signature.unsafety.is_some() {
         panic!("Trait-enumizer does not support unsafe");
     }
@@ -218,6 +216,7 @@ fn parse_method(
         ret,
         enum_attr,
         return_attr,
+        r#async,
     };
     methods.push(method);
 }
