@@ -101,7 +101,7 @@ trait Qqq {
 
 generates
 
-```rust,ignore
+```text
 enum QqqEnum { Foo{x:i32} }
 struct QqqProxy<E,F>(pub F)
     where F: FnMut(QqqEnum) -> Result<(), E>;
@@ -147,7 +147,7 @@ macro_rules! my_channelclass {
         /* Expression to send to channel from async `call_fn`s. Should include `.await` and error mapping */
     };
     (recv_async::<$T:ty>($channel:expr)) => { 
-        /* Expression to receive from cahnnel in async proxies. Should include `.await`.
+        /* Expression to receive from cahnnel in async proxies. Should include `.await`. */
      };
 }
 ```

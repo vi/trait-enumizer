@@ -1,5 +1,9 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(docsrs, doc(cfg(feature = "returnval")))]
+/// Error returned when failed to send method's return value to the channel in enum.
+/// Typically channel return the value back to caller when attempting to send to a closed channel.
+/// In Enumber, we cannot have return type dependent on T, so are just ignoring the error.
+/// 
+/// If needed, you can make your own channel class that would box up undelivered return value to some `Box<dyn Any>`. 
 pub struct FailedToSendReturnValue;
 impl std::fmt::Display for FailedToSendReturnValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -11,6 +15,7 @@ impl std::fmt::Display for FailedToSendReturnValue {
 }
 impl std::error::Error for FailedToSendReturnValue {}
 
+/// Channel class for using `flume::bounded(1)` to deliver return values. Supports both sync and async.
 #[cfg(feature = "flume")]
 #[cfg_attr(docsrs, doc(cfg(feature = "flume")))]
 #[macro_export]
@@ -27,6 +32,7 @@ macro_rules! flume_class {
 #[cfg(feature = "crossbeam-channel")]
 #[cfg_attr(docsrs, doc(cfg(feature = "crossbeam-channel")))]
 #[macro_export]
+/// Channel class for using `::crossbeam_channel::bounded(1)` to deliver return values. Sync-only.
 macro_rules! crossbeam_class {
     (Sender<$T:ty>) => { ::crossbeam_channel::Sender<$T> };
     (SendError) => { $crate::FailedToSendReturnValue };
@@ -36,7 +42,7 @@ macro_rules! crossbeam_class {
     (recv::<$T:ty>($channel:expr)) => { ($channel).recv() };
 }
 
-
+/// Channel class for using `tokio::sync::oneshot::channel()` to deliver return values. Supports both sync and async.
 #[cfg(feature = "tokio")]
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio")))]
 #[macro_export]
@@ -55,6 +61,7 @@ macro_rules! tokio_oneshot_class {
 #[cfg(feature = "catty")]
 #[cfg_attr(docsrs, doc(cfg(feature = "catty")))]
 #[macro_export]
+/// Channel class for using `catty::oneshot()` to deliver return values. Async-only.
 macro_rules! catty_class {
     (Sender<$T:ty>) => { ::catty::Sender<$T> };
     (SendError) => { $crate::FailedToSendReturnValue };
@@ -68,6 +75,7 @@ macro_rules! catty_class {
 #[cfg(feature = "futures")]
 #[cfg_attr(docsrs, doc(cfg(feature = "futures")))]
 #[macro_export]
+/// Channel class for using `futures::channel::oneshot::channel()` to deliver return values. Async-only.
 macro_rules! futures_oneshot_class {
     (Sender<$T:ty>) => { ::futures::channel::oneshot::Sender<$T> };
     (SendError) => { $crate::FailedToSendReturnValue };
