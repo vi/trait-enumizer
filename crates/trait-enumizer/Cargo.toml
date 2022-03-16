@@ -7,6 +7,9 @@ edition = "2021"
 trait-enumizer-derive = {path = "../trait-enumizer-derive"}
 flume = {version="0.10.11", optional=true}
 crossbeam-channel = {version="0.5.2", optional=true}
+tokio = { version = "1.17", optional=true, features=["sync"] }
+catty = {version="0.1.4", optional=true}
+futures = {version="0.3.21", optional=true}
 
 [dev-dependencies]
 catty = "0.1.4"

@@ -175,6 +175,7 @@ Note that those links may be broken on Docs.rs, use README on Github instead.
 * [`toowned_manual`](crates/trait-enumizer/tests/toowned_manual.rs), [`toowned_derive`](crates/trait-enumizer/tests/toowned_derive.rs) - Expanded (manual) and automaitcally derived demonstration of `#[enumizer_to_owned]` feature.
 * [`inherent_derive`](crates/trait-enumizer/tests/inherent_derive.rs) - demonstrates `inherent_impl` mode.
 * [`async_derive.rs`](crates/trait-enumizer/tests/async_derive.rs), [`async_manual.rs`](crates/trait-enumizer/tests/async_manual.rs), [`async_returnval_derive.rs`](crates/trait-enumizer/tests/async_derive.rs), [`async_returnval_manual.rs`](crates/trait-enumizer/tests/async_manual.rs), [`async_rpc.rs`](crates/trait-enumizer/tests/async_derive.rs), [`async_rpc.rs`](crates/trait-enumizer/tests/async_manual.rs) - async versions of some of the tests above.
+* [`channelclasses_showcase.rs`](crates/trait-enumizer/tests/channelclasses_showcase.rs) - various built-in channel classes.
 
 
 # See also
