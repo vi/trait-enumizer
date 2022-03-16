@@ -56,8 +56,8 @@ pub trait MyIface {
     fn divide(&mut self, denominator: i32);
     fn get(&self) -> i32;
     fn format(&self, pre: String, post: String) -> String;
-    fn sleep_async(&self, ms:usize);
-    fn sleep_sync(&self, ms:usize) -> ();
+    fn sleep_without_caller_waiting_for_it(&self, ms:usize);
+    fn sleep_making_caller_wait_for_it(&self, ms:usize) -> ();
 }
 
 pub struct Implementor(pub i32);
@@ -83,11 +83,11 @@ impl MyIface for Implementor {
         format!("{}{}{}", pre, self.0, post)
     }
 
-    fn sleep_async(&self, ms:usize) {
+    fn sleep_without_caller_waiting_for_it(&self, ms:usize) {
         std::thread::sleep(std::time::Duration::from_millis(ms as u64))
     }
 
-    fn sleep_sync(&self, ms:usize) -> () {
+    fn sleep_making_caller_wait_for_it(&self, ms:usize) -> () {
         std::thread::sleep(std::time::Duration::from_millis(ms as u64))
     }
 }
@@ -122,13 +122,13 @@ fn test() {
     let c_ = c.clone();
     std::thread::spawn(move || {
         let p = MyIfaceProxy::<_, _>(|msg| tx1_.send(serde_json::to_string(&msg).unwrap()), c_);
-        p.sleep_sync(5);
+        p.sleep_making_caller_wait_for_it(5);
         dbg!(p.get());
-        p.sleep_sync(5);
+        p.sleep_making_caller_wait_for_it(5);
         dbg!(p.get());
-        p.sleep_sync(5);
+        p.sleep_making_caller_wait_for_it(5);
         dbg!(p.get());
-        p.sleep_sync(5);
+        p.sleep_making_caller_wait_for_it(5);
         dbg!(p.get());
     });
 
@@ -137,7 +137,7 @@ fn test() {
     p.addone();
     dbg!(p.get());
     p.double();
-    p.sleep_sync(20);
+    p.sleep_without_caller_waiting_for_it(20);
     dbg!(p.get());
     p.divide(3);
     eprintln!("{}", p.format("[[[".to_owned(), "]]]".to_owned()));

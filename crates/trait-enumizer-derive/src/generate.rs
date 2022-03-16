@@ -125,13 +125,18 @@ impl InputData {
                 (false, true) => false,
                 _ => true,
             };
+            let maybe_await = if method.r#async {
+                q! {.await}
+            } else {
+                q! {}
+            };
             let action = if can_do_it1 && can_do_it2 {
                 if let Some(return_type) = &method.ret {
                     if let Some(returnval_handler_macro) = returnval_handler {
-                        let (send_pseudomethod_name, maybe_await) = if method.r#async {
-                            (q! {send_async}, q! {.await})
+                        let send_pseudomethod_name = if cfparams.r#async {
+                            q! {send_async}
                         } else {
-                            (q! {send}, q! {})
+                            q! {send}
                         };
                         let maybe_extraarg = if extra_arg.is_some() {
                             q! {, extra_arg}
@@ -143,11 +148,6 @@ impl InputData {
                         unreachable!("parsing function should have already rejected this case");
                     }
                 } else {
-                    let maybe_await = if method.r#async {
-                        q! {.await}
-                    } else {
-                        q! {}
-                    };
                     if returnval_handler.is_none() {
                         q! {o.#method_name(#variant_params) #maybe_await}
                     } else {
