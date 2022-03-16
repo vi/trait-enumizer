@@ -2,9 +2,16 @@
 name = "trait-enumizer"
 version = "0.1.0"
 edition = "2021"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/vi/trait-enumizer/"
+description = "Proc macro to automatically generate enum based on method signatures (with appropriate helpers)"
+keywords = ["enum", "trait", "derive", "enumizer"]
+categories = ["rust-patterns"]
+include = ["src","Cargo.toml","tests", "../../README.md"]
+readme = "../../README.md"
 
 [dependencies]
-trait-enumizer-derive = {path = "../trait-enumizer-derive"}
+trait-enumizer-derive = {path = "../trait-enumizer-derive", version="0.1.0"}
 flume = {version="0.10.11", optional=true}
 crossbeam-channel = {version="0.5.2", optional=true}
 tokio = { version = "1.17", optional=true, features=["sync"] }
