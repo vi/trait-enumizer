@@ -7,8 +7,8 @@ repository = "https://github.com/vi/trait-enumizer/"
 description = "Proc macro to automatically generate enum based on method signatures (with appropriate helpers)"
 keywords = ["enum", "trait", "derive", "enumizer"]
 categories = ["rust-patterns"]
-include = ["src","Cargo.toml","tests", "../../README.md"]
-readme = "../../README.md"
+include = ["src","Cargo.toml","tests", "README.md", "doc_header.png"]
+readme = "README.md"
 
 [dependencies]
 trait-enumizer-derive = {path = "../trait-enumizer-derive", version="0.1.0"}
@@ -31,3 +31,7 @@ tokio = { version = "1.17", features = ["rt", "macros", "time"]}
 
 [features]
 default=[]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
