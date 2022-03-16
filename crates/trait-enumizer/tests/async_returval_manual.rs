@@ -1,5 +1,5 @@
 #![cfg(feature="flume")]
-use trait_enumizer::async_flume_class;
+
 use trait_enumizer::flume_class;
 
 struct Qqq {}
@@ -23,16 +23,16 @@ impl Qqq {
 // Begin of the part which is supposed to be auto-generated
 
 enum QqqEnum {
-    Foo { ret: async_flume_class!(Sender<String>)},
-    Bar { x: i32, ret: async_flume_class!(Sender<i32>) },
+    Foo { ret: flume_class!(Sender<String>)},
+    Bar { x: i32, ret: flume_class!(Sender<i32>) },
     Baz { y: String, z: Vec<u8> },
 }
 
 impl QqqEnum {
-    async fn try_call(self, o: &Qqq) -> Result<(), async_flume_class!(SendError) > {
+    async fn try_call(self, o: &Qqq) -> Result<(), flume_class!(SendError) > {
         match self {
-            QqqEnum::Foo { ret} => async_flume_class!(send::<String>(ret, o.foo())),
-            QqqEnum::Bar { x , ret} => async_flume_class!(send::<i32>(ret, o.bar(x).await)),
+            QqqEnum::Foo { ret} => flume_class!(send_async::<String>(ret, o.foo())),
+            QqqEnum::Bar { x , ret} => flume_class!(send_async::<i32>(ret, o.bar(x).await)),
             QqqEnum::Baz { y, z } => Ok(o.baz(y, z).await),
         }
     }
@@ -58,16 +58,16 @@ impl<E, F: Fn(QqqEnum) -> Result<(), E>> QqqUsualProxy<E, F> {
 }
 struct QqqAsyncProxy<E, F: Fn(QqqEnum) -> Fu, Fu: std::future::Future<Output = Result<(), E>>>(F);
 impl<E, F: Fn(QqqEnum) -> Fu, Fu: std::future::Future<Output = Result<(), E>>> QqqAsyncProxy<E, F, Fu> {
-    async fn try_foo(&self) -> Result<Result<String, async_flume_class!(RecvError)>, E> {
-        let (tx, rx) = async_flume_class!(create::<String>());
+    async fn try_foo(&self) -> Result<Result<String, flume_class!(RecvError)>, E> {
+        let (tx, rx) = flume_class!(create::<String>());
         self.0(QqqEnum::Foo { ret: tx }).await?;
-        Ok(async_flume_class!(recv::<i32>(rx)))
+        Ok(flume_class!(recv_async::<i32>(rx)))
     }
 
-    async fn try_bar(&self, x: i32) -> Result<Result<i32, async_flume_class!(RecvError)>, E> {
+    async fn try_bar(&self, x: i32) -> Result<Result<i32, flume_class!(RecvError)>, E> {
         let (tx, rx) = flume_class!(create::<i32>());
         self.0(QqqEnum::Bar { x, ret: tx }).await?;
-        Ok(flume_class!(recv::<i32>(rx)))
+        Ok(flume_class!(recv_async::<i32>(rx)))
     }
 
     async fn try_baz(&self, y: String, z: Vec<u8>) -> Result<(), E> {

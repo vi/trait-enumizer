@@ -4,12 +4,9 @@ use quote::quote as q;
 
 use crate::{CallFnParams, GenProxyParams};
 
-use super::{ReceiverStyle, InputData};
+use super::{InputData, ReceiverStyle};
 impl InputData {
-    pub(crate) fn generate_enum(
-        &self,
-        out: &mut TokenStream,
-    ) {
+    pub(crate) fn generate_enum(&self, out: &mut TokenStream) {
         let returnval_handler = self.params.returnval.as_ref();
         let custom_attrs = &self.params.enum_attr[..];
         let pub_or_priv = self.params.access_mode.code();
@@ -22,19 +19,21 @@ impl InputData {
                 let argument_name = &arg.name;
                 let argument_type = if !arg.to_owned {
                     let ty = &arg.ty;
-                    q!{#ty}
+                    q! {#ty}
                 } else {
                     match &arg.ty {
                         syn::Type::Reference(r) => {
                             let ty = &*r.elem;
-                            q!{<#ty as ::std::borrow::ToOwned>::Owned}
+                            q! {<#ty as ::std::borrow::ToOwned>::Owned}
                         }
-                        _ => panic!("Argument marked with `#[enumizer_to_owned]` must be a &reference"),
+                        _ => panic!(
+                            "Argument marked with `#[enumizer_to_owned]` must be a &reference"
+                        ),
                     }
                 };
                 let mut custom_attributes = TokenStream::new();
                 for aa in &arg.enum_attr {
-                    custom_attributes.extend(q!{# #aa});
+                    custom_attributes.extend(q! {# #aa});
                 }
                 variant_params.extend(q! {
                     #custom_attributes #argument_name : #argument_type,
@@ -43,20 +42,20 @@ impl InputData {
             if let Some(return_type) = &method.ret {
                 let mut custom_attributes = TokenStream::new();
                 for aa in &method.return_attr {
-                    custom_attributes.extend(q!{# #aa});
+                    custom_attributes.extend(q! {# #aa});
                 }
-                let returnval_macro = returnval_handler.unwrap(); 
-                variant_params.extend(q!{
+                let returnval_macro = returnval_handler.unwrap();
+                variant_params.extend(q! {
                     #custom_attributes ret : #returnval_macro ! (Sender<#return_type>),
                 });
             } else {
-                if ! method.return_attr.is_empty() {
+                if !method.return_attr.is_empty() {
                     panic!("`enumizer_return_attr[]` used in method without a return type. Add `-> ()` to force using the return channel.");
                 }
             }
             let mut custom_attributes = TokenStream::new();
             for aa in &method.enum_attr {
-                custom_attributes.extend(q!{# #aa});
+                custom_attributes.extend(q! {# #aa});
             }
 
             variants.extend(q! {
@@ -65,7 +64,7 @@ impl InputData {
         }
         let mut customattrs = TokenStream::new();
         for ca in custom_attrs {
-            customattrs.extend(q!{# #ca});
+            customattrs.extend(q! {# #ca});
         }
         out.extend(q! {
             #customattrs
@@ -75,11 +74,7 @@ impl InputData {
         });
     }
 
-    pub(crate) fn generate_call_fn(
-        &self,
-        out: &mut TokenStream,
-        cfparams : &CallFnParams,
-    ) {
+    pub(crate) fn generate_call_fn(&self, out: &mut TokenStream, cfparams: &CallFnParams) {
         let pub_or_priv = self.params.access_mode.code();
         let returnval_handler = self.params.returnval.as_ref();
         let extra_arg = cfparams.extra_arg.as_ref();
@@ -133,23 +128,25 @@ impl InputData {
             let action = if can_do_it1 && can_do_it2 {
                 if let Some(return_type) = &method.ret {
                     if let Some(returnval_handler_macro) = returnval_handler {
-                        if method.r#async {
-                            panic!("Async methods with return types are not yet supported");
-                        }
-                        let maybe_extraarg = if extra_arg.is_some() {
-                            q!{, extra_arg}
+                        let (send_pseudomethod_name, maybe_await) = if method.r#async {
+                            (q! {send_async}, q! {.await})
                         } else {
-                            q!{}
+                            (q! {send}, q! {})
                         };
-                        q! { Ok(#returnval_handler_macro ! (send::<#return_type>(ret, o.#method_name(#variant_params) #maybe_extraarg))?)  }
+                        let maybe_extraarg = if extra_arg.is_some() {
+                            q! {, extra_arg}
+                        } else {
+                            q! {}
+                        };
+                        q! { Ok(#returnval_handler_macro ! (#send_pseudomethod_name::<#return_type>(ret, o.#method_name(#variant_params) #maybe_await #maybe_extraarg))?)  }
                     } else {
                         unreachable!("parsing function should have already rejected this case");
                     }
                 } else {
                     let maybe_await = if method.r#async {
-                        q!{.await}
+                        q! {.await}
                     } else {
-                        q!{}
+                        q! {}
                     };
                     if returnval_handler.is_none() {
                         q! {o.#method_name(#variant_params) #maybe_await}
@@ -190,26 +187,26 @@ impl InputData {
             (true, ReceiverStyle::Mut) => q! {o: &mut #input_trait_or_type_name},
             (true, ReceiverStyle::Ref) => q! {o: & #input_trait_or_type_name},
         };
-        let maybe_requirement = if ! self.params.inherent_impl_mode {
-            q!{<I: #input_trait_or_type_name>}
+        let maybe_requirement = if !self.params.inherent_impl_mode {
+            q! {<I: #input_trait_or_type_name>}
         } else {
-            q!{}
+            q! {}
         };
 
         let maybe_returntype = if let Some(returnval_handler_macro) = returnval_handler {
-            q!{ -> Result<(), #returnval_handler_macro ! (SendError)>}
+            q! { -> Result<(), #returnval_handler_macro ! (SendError)>}
         } else {
-            q!{}
+            q! {}
         };
         let maybe_extraarg = if let Some(extr) = extra_arg {
-            q!{, extra_arg : #extr}
+            q! {, extra_arg : #extr}
         } else {
-            q!{}
+            q! {}
         };
         let maybe_async = if cfparams.r#async {
-            q!{async}
+            q! {async}
         } else {
-            q!{}
+            q! {}
         };
         out.extend(q! {
             impl #enum_name {
@@ -249,12 +246,12 @@ impl InputData {
             let slf = level.ts();
             let ret = if let Some(return_type) = &method.ret {
                 if let Some(returnval_handler_macro) = returnval_handler {
-                    q!{::std::result::Result<#return_type, #returnval_handler_macro ! ( RecvError )>}
+                    q! {::std::result::Result<#return_type, #returnval_handler_macro ! ( RecvError )>}
                 } else {
                     unreachable!("Should had been rejected earlier")
                 }
             } else {
-                q!{()}
+                q! {()}
             };
             methods.extend(q! {
                 fn #rt_method_name(#slf, #args ) -> ::std::result::Result<#ret, E>;
@@ -268,11 +265,7 @@ impl InputData {
         });
     }
 
-    pub(crate) fn generate_proxy(
-        &self,
-        out: &mut TokenStream,
-        gpparams: &GenProxyParams,
-    ) {
+    pub(crate) fn generate_proxy(&self, out: &mut TokenStream, gpparams: &GenProxyParams) {
         let pub_or_priv = self.params.access_mode.code();
         let returnval_handler = self.params.returnval.as_ref();
         let extra_arg = gpparams.extra_arg.as_ref();
@@ -281,7 +274,7 @@ impl InputData {
         let resultified_trait_name = gpparams.traitname.as_ref();
         let proxy_name = &gpparams.name;
         let pub_or_priv2 = if resultified_trait_name.is_some() {
-            q!{}
+            q! {}
         } else {
             pub_or_priv.clone()
         };
@@ -299,7 +292,7 @@ impl InputData {
                 args_with_types_for_signature.extend(q! {
                     #argname : #argtype,
                 });
-                if ! arg.to_owned {
+                if !arg.to_owned {
                     enum_variant_fields.extend(q! {
                         #argname,
                     });
@@ -310,34 +303,26 @@ impl InputData {
                 }
             }
             let slf = level.ts();
-            let maybe_async = if gpparams.r#async {
-                q!{async}
+            let (maybe_async, maybe_await, recv_pseudomethod_name) = if gpparams.r#async {
+                (q!{async}, q!{.await}, q!{recv_async})
             } else {
-                q!{}
+                (q!{}, q!{}, q!{recv})
             };
             if let Some(rt) = &method.ret {
-                if gpparams.r#async {
-                    panic!("Async and returnval are not yet supported together for proxies");
-                }
                 let returnval_handler_macro = returnval_handler.unwrap();
                 let (maybe_extraarg_with_comma, maybe_extraarg) = if let Some(_eat) = extra_arg {
-                    (q!{, self.1}, q!{self.1})
+                    (q! {, self.1}, q! {self.1})
                 } else {
-                    (q!{}, q!{})
+                    (q! {}, q! {})
                 };
                 methods.extend(q! {
                     #pub_or_priv2 #maybe_async fn #rt_method_name(#slf, #args_with_types_for_signature ) -> ::std::result::Result<::std::result::Result<#rt, #returnval_handler_macro ! (RecvError)>, E> {
                         let (tx, rx) = #returnval_handler_macro !(create::<#rt>(#maybe_extraarg));
-                        self.0(#enum_name::#variant_name { #enum_variant_fields ret: tx })?;
-                        Ok(#returnval_handler_macro ! (recv::<#rt>(rx #maybe_extraarg_with_comma) ) )
+                        self.0(#enum_name::#variant_name { #enum_variant_fields ret: tx }) #maybe_await ?;
+                        Ok(#returnval_handler_macro ! (#recv_pseudomethod_name::<#rt>(rx #maybe_extraarg_with_comma) ) )
                     }
                 });
             } else {
-                let maybe_await = if gpparams.r#async {
-                    q!{.await}
-                } else {
-                    q!{}
-                };
                 methods.extend(q! {
                     #pub_or_priv2 #maybe_async fn #rt_method_name(#slf, #args_with_types_for_signature ) -> ::std::result::Result<(), E> {
                         self.0(#enum_name::#variant_name{ #enum_variant_fields }) #maybe_await
@@ -348,29 +333,29 @@ impl InputData {
         let fn_trait = level.fn_trait();
 
         let maybe_extraarg = if let Some(eat) = extra_arg {
-            q!{, pub #eat}
+            q! {, pub #eat}
         } else {
-            q!{}
+            q! {}
         };
 
         let maybe_trait_for_impl = if let Some(rtn) = resultified_trait_name {
-            q!{#rtn<E> for}
+            q! {#rtn<E> for}
         } else {
-            q!{}
+            q! {}
         };
 
         #[allow(non_snake_case)]
         let F_and_maybe_Fu_genparams = if gpparams.r#async {
-            q!{ F: #fn_trait(#enum_name) -> Fu, Fu: ::std::future::Future<Output = ::std::result::Result<(), E>>  }
+            q! { F: #fn_trait(#enum_name) -> Fu, Fu: ::std::future::Future<Output = ::std::result::Result<(), E>>  }
         } else {
-            q!{ F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>  }
+            q! { F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>  }
         };
 
         #[allow(non_snake_case)]
         let maybe_Fu = if gpparams.r#async {
-            q!{, Fu}
+            q! {, Fu}
         } else {
-            q!{}
+            q! {}
         };
 
         out.extend(q! {
@@ -381,7 +366,11 @@ impl InputData {
             }
         });
     }
-    pub(crate) fn generate_infallible_impl(&self, out: &mut TokenStream, gpparams: &GenProxyParams) {
+    pub(crate) fn generate_infallible_impl(
+        &self,
+        out: &mut TokenStream,
+        gpparams: &GenProxyParams,
+    ) {
         let resultified_trait_name = gpparams.traitname.as_ref();
         let name = &self.name;
         let mut methods = TokenStream::new();
@@ -474,12 +463,12 @@ impl InputData {
                 (ReceiverStyle::Ref, ReceiverStyle::Mut) => false,
                 (ReceiverStyle::Ref, ReceiverStyle::Ref) => true,
             };
-            let mut maybe_second_unwrap = q!{};
+            let mut maybe_second_unwrap = q! {};
             let returntype = if let Some(rt) = &method.ret {
-                maybe_second_unwrap = q!{.unwrap()};
-                q!{-> #rt}
+                maybe_second_unwrap = q! {.unwrap()};
+                q! {-> #rt}
             } else {
-                q!{}
+                q! {}
             };
             if can_call {
                 let slf2 = match (method.receiver_style, level) {
@@ -509,9 +498,9 @@ impl InputData {
             }
         }
         let maybe_additional_where_clause = if let Some(returval_macro) = returnval_handler {
-            q!{,#returval_macro ! (RecvError) : ::std::fmt::Debug}
+            q! {,#returval_macro ! (RecvError) : ::std::fmt::Debug}
         } else {
-            q!{}
+            q! {}
         };
         out.extend(q! {
             impl<E, F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>>  #name for #proxy_name<E,F> where E : ::std::fmt::Debug #maybe_additional_where_clause {
