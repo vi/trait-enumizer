@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// Error returned when failed to send method's return value to the channel in enum.
 /// Typically channel return the value back to caller when attempting to send to a closed channel.
-/// In Enumber, we cannot have return type dependent on T, so are just ignoring the error.
+/// In Enumizer, we cannot have return type dependent on T, so are just ignoring the value.
 /// 
 /// If needed, you can make your own channel class that would box up undelivered return value to some `Box<dyn Any>`. 
 pub struct FailedToSendReturnValue;

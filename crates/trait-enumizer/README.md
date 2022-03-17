@@ -72,9 +72,7 @@ impl QqqEnum {
 
 Proxies are generated when you use `proxy()` parameter. They use the following subparameters:
 
-* `proxy()` - Generate proxy struct to "convert" the trait to enum values. Proxy is a tuple struct. First field is your `Fn`, `FnMut` or `FnOnce` closure. You can also add second field using special parameter.
-
-* `Fn`, `FnMut`, `FnOnce` - Set type of closure that the proxy will carry.
+* `Fn`, `FnMut`, `FnOnce` - Set type of closure that the proxy will carry. Required.
 * `name=<ident>` - name of the generated struct. Required.
 * `resultified_trait=<ident>` - Also generate "resultified" trait instead of implementing `try_*` functions inherently.
 * `infallible_impl` - Make the proxy also implement the original trait, provided your sink function does not err.
