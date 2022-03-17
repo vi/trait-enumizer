@@ -181,3 +181,4 @@ Note that those links may be broken on Docs.rs, use README on Github instead.
 # See also
 
 * [spaad](https://crates.io/crates/spaad)
+* [enum_dispatch](https://crates.io/crates/enum_dispatch)
