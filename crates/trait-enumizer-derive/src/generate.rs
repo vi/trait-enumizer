@@ -194,7 +194,7 @@ impl InputData {
         };
 
         let maybe_returntype = if let Some(returnval_handler_macro) = returnval_handler {
-            q! { -> Result<(), #returnval_handler_macro ! (SendError)>}
+            q! { -> ::std::result::Result<(), #returnval_handler_macro ! (SendError)>}
         } else {
             q! {}
         };
