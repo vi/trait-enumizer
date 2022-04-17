@@ -6,7 +6,7 @@ license = "MIT/Apache-2.0"
 repository = "https://github.com/vi/trait-enumizer/"
 description = "Proc macro to automatically generate enum based on method signatures (with appropriate helpers)"
 keywords = ["enum", "trait", "derive", "enumizer"]
-categories = ["rust-patterns"]
+categories = ["rust-patterns", "no-std"]
 include = ["src","Cargo.toml","tests", "README.md", "doc_header.png"]
 readme = "README.md"
 

@@ -11,6 +11,7 @@ Generate enum from a trait, with converters between them.
 * Generation of a proxy that allows obtaining a sequence of enum values using method calls from original trait (if possible) or API similar to original. Proxy also helps dealing with "channelizing" return values.
 * Handling return values.
 * Handling async (inherent impl only).
+* I tried to make the crate `no_std`-friendly, but have not tested it.
 
 The library can be used as a synchronisation mechanism or as a building block to build actors or remote procedure calls.
 
@@ -175,6 +176,10 @@ Note that those links may be broken on Docs.rs, use README on Github instead.
 * [`async_derive.rs`](crates/trait-enumizer/tests/async_derive.rs), [`async_manual.rs`](crates/trait-enumizer/tests/async_manual.rs), [`async_returnval_derive.rs`](crates/trait-enumizer/tests/async_derive.rs), [`async_returnval_manual.rs`](crates/trait-enumizer/tests/async_manual.rs), [`async_rpc.rs`](crates/trait-enumizer/tests/async_derive.rs), [`async_rpc.rs`](crates/trait-enumizer/tests/async_manual.rs) - async versions of some of the tests above.
 * [`channelclasses_showcase.rs`](crates/trait-enumizer/tests/channelclasses_showcase.rs) - various built-in channel classes.
 
+
+# Cargo features
+
+Most features enable respective channel classes. `std` crate feature, which is enabled by default, apart from enabling stdmpsc channel class also enables `enumizer_to_owned` through `::std::borrow::ToOwned` trait. `alloc` feature enables alternative `enumizer_to_owned` mode using `::alloc::borrow::ToOwned` instead (but you need to declare `extern crate alloc;` yourself). `std` supersedes `alloc`.
 
 # See also
 
