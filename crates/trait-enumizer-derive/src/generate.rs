@@ -105,7 +105,7 @@ impl InputData {
                     });
                 } else {
                     variant_params.extend(q! {
-                        ::std::borrow::Borrow::borrow(& #argname),
+                        ::core::borrow::Borrow::borrow(& #argname),
                     });
                 }
             }
@@ -194,7 +194,7 @@ impl InputData {
         };
 
         let maybe_returntype = if let Some(returnval_handler_macro) = returnval_handler {
-            q! { -> ::std::result::Result<(), #returnval_handler_macro ! (SendError)>}
+            q! { -> ::core::result::Result<(), #returnval_handler_macro ! (SendError)>}
         } else {
             q! {}
         };
@@ -246,7 +246,7 @@ impl InputData {
             let slf = level.ts();
             let ret = if let Some(return_type) = &method.ret {
                 if let Some(returnval_handler_macro) = returnval_handler {
-                    q! {::std::result::Result<#return_type, #returnval_handler_macro ! ( RecvError )>}
+                    q! {::core::result::Result<#return_type, #returnval_handler_macro ! ( RecvError )>}
                 } else {
                     unreachable!("Should had been rejected earlier")
                 }
@@ -254,7 +254,7 @@ impl InputData {
                 q! {()}
             };
             methods.extend(q! {
-                fn #rt_method_name(#slf, #args ) -> ::std::result::Result<#ret, E>;
+                fn #rt_method_name(#slf, #args ) -> ::core::result::Result<#ret, E>;
             });
         }
 
@@ -316,7 +316,7 @@ impl InputData {
                     (q! {}, q! {})
                 };
                 methods.extend(q! {
-                    #pub_or_priv2 #maybe_async fn #rt_method_name(#slf, #args_with_types_for_signature ) -> ::std::result::Result<::std::result::Result<#rt, #returnval_handler_macro ! (RecvError)>, E> {
+                    #pub_or_priv2 #maybe_async fn #rt_method_name(#slf, #args_with_types_for_signature ) -> ::core::result::Result<::core::result::Result<#rt, #returnval_handler_macro ! (RecvError)>, E> {
                         let (tx, rx) = #returnval_handler_macro !(create::<#rt>(#maybe_extraarg));
                         self.0(#enum_name::#variant_name { #enum_variant_fields ret: tx }) #maybe_await ?;
                         Ok(#returnval_handler_macro ! (#recv_pseudomethod_name::<#rt>(rx #maybe_extraarg_with_comma) ) )
@@ -324,7 +324,7 @@ impl InputData {
                 });
             } else {
                 methods.extend(q! {
-                    #pub_or_priv2 #maybe_async fn #rt_method_name(#slf, #args_with_types_for_signature ) -> ::std::result::Result<(), E> {
+                    #pub_or_priv2 #maybe_async fn #rt_method_name(#slf, #args_with_types_for_signature ) -> ::core::result::Result<(), E> {
                         self.0(#enum_name::#variant_name{ #enum_variant_fields }) #maybe_await
                     }
                 });
@@ -346,9 +346,9 @@ impl InputData {
 
         #[allow(non_snake_case)]
         let F_and_maybe_Fu_genparams = if gpparams.r#async {
-            q! { F: #fn_trait(#enum_name) -> Fu, Fu: ::std::future::Future<Output = ::std::result::Result<(), E>>  }
+            q! { F: #fn_trait(#enum_name) -> Fu, Fu: ::core::future::Future<Output = ::core::result::Result<(), E>>  }
         } else {
-            q! { F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>  }
+            q! { F: #fn_trait(#enum_name) -> ::core::result::Result<(), E>  }
         };
 
         #[allow(non_snake_case)]
@@ -406,7 +406,7 @@ impl InputData {
         }
         if let Some(rtn) = resultified_trait_name {
             out.extend(q! {
-                impl<R:#rtn<::std::convert::Infallible>> #name for R {
+                impl<R:#rtn<::core::convert::Infallible>> #name for R {
                     #methods
                 }
             });
@@ -415,7 +415,7 @@ impl InputData {
             let fn_trait = gpparams.level.fn_trait();
             let enum_name = &self.params.enum_name;
             out.extend(q! {
-                impl<F: #fn_trait(#enum_name) -> ::std::result::Result<(), ::std::convert::Infallible>> #name for #proxy_name<::std::convert::Infallible, F> {
+                impl<F: #fn_trait(#enum_name) -> ::core::result::Result<(), ::core::convert::Infallible>> #name for #proxy_name<::core::convert::Infallible, F> {
                     #methods
                 }
             });
@@ -498,12 +498,12 @@ impl InputData {
             }
         }
         let maybe_additional_where_clause = if let Some(returval_macro) = returnval_handler {
-            q! {,#returval_macro ! (RecvError) : ::std::fmt::Debug}
+            q! {,#returval_macro ! (RecvError) : ::core::fmt::Debug}
         } else {
             q! {}
         };
         out.extend(q! {
-            impl<E, F: #fn_trait(#enum_name) -> ::std::result::Result<(), E>>  #name for #proxy_name<E,F> where E : ::std::fmt::Debug #maybe_additional_where_clause {
+            impl<E, F: #fn_trait(#enum_name) -> ::core::result::Result<(), E>>  #name for #proxy_name<E,F> where E : ::core::fmt::Debug #maybe_additional_where_clause {
                 #methods
             }
         });
