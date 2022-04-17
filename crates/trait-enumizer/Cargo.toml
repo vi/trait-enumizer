@@ -31,7 +31,8 @@ tokio = { version = "1.17", features = ["rt", "macros", "time"]}
 
 [features]
 default=["std"]
-std=[]
+std=["trait-enumizer-derive/std"]
+alloc=["trait-enumizer-derive/alloc"]
 
 [package.metadata.docs.rs]
 all-features = true

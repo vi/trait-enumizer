@@ -4,6 +4,20 @@ use quote::quote as q;
 
 use crate::{CallFnParams, GenProxyParams};
 
+#[cfg(feature="std")]
+fn borrow_toowned() -> TokenStream {
+    q!{::std::borrow::ToOwned}
+}
+#[cfg(all(feature="alloc",not(feature="std")))]
+fn borrow_toowned() -> TokenStream {
+    q!{::alloc::borrow::ToOwned}
+}
+#[cfg(all(not(feature="alloc"),not(feature="std")))]
+fn borrow_toowned() -> TokenStream {
+    panic!("Cannot use borrow::ToOwned without either `std` or `alloc` features of trait-enumizer")
+}
+
+
 use super::{InputData, ReceiverStyle};
 impl InputData {
     pub(crate) fn generate_enum(&self, out: &mut TokenStream) {
@@ -24,7 +38,8 @@ impl InputData {
                     match &arg.ty {
                         syn::Type::Reference(r) => {
                             let ty = &*r.elem;
-                            q! {<#ty as ::std::borrow::ToOwned>::Owned}
+                            let toowned = borrow_toowned();
+                            q! {<#ty as #toowned>::Owned}
                         }
                         _ => panic!(
                             "Argument marked with `#[enumizer_to_owned]` must be a &reference"
@@ -297,8 +312,9 @@ impl InputData {
                         #argname,
                     });
                 } else {
+                    let toowned = borrow_toowned();
                     enum_variant_fields.extend(q! {
-                        #argname: ::std::borrow::ToOwned::to_owned(#argname),
+                        #argname: #toowned::to_owned(#argname),
                     });
                 }
             }
