@@ -5,14 +5,15 @@
 /// 
 /// If needed, you can make your own channel class that would box up undelivered return value to some `Box<dyn Any>`. 
 pub struct FailedToSendReturnValue;
-impl std::fmt::Display for FailedToSendReturnValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for FailedToSendReturnValue {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
             "trait-enumizer: Failed to send return value back to caller"
         )
     }
 }
+#[cfg(feature="std")]
 impl std::error::Error for FailedToSendReturnValue {}
 
 /// Channel class for using `flume::bounded(1)` to deliver return values. Supports both sync and async.
