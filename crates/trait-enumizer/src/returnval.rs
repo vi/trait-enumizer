@@ -87,3 +87,17 @@ macro_rules! futures_oneshot_class {
     (recv_async::<$T:ty>($channel:expr)) => { ($channel).await };
 }
 
+
+
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+#[macro_export]
+/// Channel class for using `std::sync::mpsc::sync_channel(1)` to deliver return values. Sync-only.
+macro_rules! stdmpsc_class {
+    (Sender<$T:ty>) => { ::std::sync::mpsc::SyncSender<$T> };
+    (SendError) => { $crate::FailedToSendReturnValue };
+    (RecvError) => { ::std::sync::mpsc::RecvError };
+    (create::<$T:ty>()) => { ::std::sync::mpsc::sync_channel(1) };
+    (send::<$T:ty>($channel:expr, $msg:expr)) => { ($channel).send($msg).map_err(|_| $crate::FailedToSendReturnValue) };
+    (recv::<$T:ty>($channel:expr)) => { ($channel).recv() };
+}

@@ -3,12 +3,14 @@
 #![cfg(feature="tokio")]
 #![cfg(feature="catty")]
 #![cfg(feature="futures")]
+#![cfg(feature="std")]
 
 use trait_enumizer::flume_class;
 use trait_enumizer::crossbeam_class;
 use trait_enumizer::tokio_oneshot_class;
 use trait_enumizer::catty_class;
 use trait_enumizer::futures_oneshot_class;
+use trait_enumizer::stdmpsc_class;
 
 struct Qqq {}
 
@@ -48,6 +50,13 @@ struct Qqq {}
     returnval=futures_oneshot_class,
     call_fn(ref,name=try_call),
     proxy(Fn,name=FuturesOneshotProxy,async),
+)]
+#[trait_enumizer::enumizer(
+    name=WithStdMpsc,
+    inherent_impl,
+    returnval=stdmpsc_class,
+    call_fn(ref,name=try_call),
+    proxy(Fn,name=StdMpscProxy),
 )]
 impl Qqq {
     fn foo(&self) -> String {
@@ -113,4 +122,12 @@ async fn futures_oneshot() {
     let p = FuturesOneshotProxy::<std::convert::Infallible, _, _>(|c: WithFuturesOneshot| async { Ok(c.try_call(&o).unwrap()) });
 
     dbg!(p.try_foo().await.unwrap().unwrap());
+}
+
+#[test]
+fn stdmpsc_sync() {
+    let o = Qqq {};
+    let p = StdMpscProxy::<std::convert::Infallible, _>(|c: WithStdMpsc| Ok(c.try_call(&o).unwrap()));
+
+    dbg!(p.try_foo().unwrap().unwrap());
 }
