@@ -115,14 +115,14 @@ impl<E,F> QqqProxy where ... {
 Pseudo-derive-helpers are attributes that are handled by this library. You are supposed to used them inside your input trait or impl before method signature or before argument inside signature. Other (unknown) attributes are passed though unmodified.
 
 * `#[enumizer_enum_attr[...]]` - Forward specified attribute to generated enum. Example: `#[enumizer_enum_attr[serde(rename="qqq")]]`. Can be attached to functions (which become enum variants) or to function arguments (which become enum variant fields).
-* `#[enumizer_return_attr[...]]` - in `returnval` mode, attach custom attribute to the `ret` field of the enum.
+* `#[enumizer_return_attr[...]]` - in `returnval` mode, attach custom attribute to the `ret` field of the enum variant.
 * `#[enumizer_to_owned]` - For reference argument type, use owned value instead of trying to put reference to enum (which may not work, unless `'static`).
 
 # Returnval pseudotrait
 
 If you want Enumizer to handle return values, you need a channel of some sort. Enumizer is flexible in channel choice. There are built in "classes" for some popular channel types, you may also need to implement a channel class yourself.
 
-You specify channel class as value for `returnval` parameter, e.g. `returnval=trait_enumizer::flume_class`. Early in Enumizer design channel classes were traits using GAT, but now they are special `macro_rules`-based macros.
+You specify channel class as value for `returnval` parameter, e.g. `returnval=flume_class` (you need to import it: `use trait_enumizer::flume_class;`). Early in Enumizer design channel classes were traits using GAT, but now they are special `macro_rules`-based macros.
 
 Here is API of a channel class:
 
